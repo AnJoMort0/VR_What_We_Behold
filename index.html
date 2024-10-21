@@ -2,6 +2,18 @@
 <html>
   <head>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <style>
+      /* Style for the camera overlay */
+      #cameraOverlay {
+        position: fixed;
+        top: 5%;
+        left: 5%;
+        width: 90%;
+        height: 90%;
+        pointer-events: none; /* Allows interaction with A-Frame */
+        z-index: 9999;
+      }
+    </style>
   </head>
   <body>
     <a-scene fog="type: linear; color: #D3D3D3; near: 20; far: 80">
@@ -10,7 +22,7 @@
         <img id="ground" src="sprites/ground.png">
       </a-assets>
 
-      <!-- Camera that keeps player in place -->
+      <!-- Camera entity to keep player in place -->
       <a-entity camera look-controls position="0 1.4 0"></a-entity>
 
       <!-- Infinite ground plane -->
@@ -26,5 +38,8 @@
       <!-- Sky to give a sense of openness -->
       <a-sky color="#D3D3D3"></a-sky>
     </a-scene>
+
+    <!-- Camera overlay -->
+    <img id="cameraOverlay" src="sprites/cam.png">
   </body>
 </html>
