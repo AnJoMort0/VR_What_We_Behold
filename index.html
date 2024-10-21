@@ -10,10 +10,10 @@
         <img id="ground" src="sprites/ground.png">
       </a-assets>
 
-      <!-- Camera entity to keep player in place -->
+      <!-- Camera that keeps player in place -->
       <a-entity camera look-controls position="0 1.4 0"></a-entity>
 
-      <!-- Infinite ground plane with scaled-up texture -->
+      <!-- Infinite ground plane -->
       <a-plane 
         src="#ground" 
         position="0 0 0" 
@@ -23,7 +23,7 @@
         material="repeat: 40 40; side: double;">
       </a-plane>
 
-      <!-- Sky to give a sense of openness but with a light grey tone -->
+      <!-- Sky to give a sense of openness -->
       <a-sky color="#D3D3D3"></a-sky>
     </a-scene>
   </body>
