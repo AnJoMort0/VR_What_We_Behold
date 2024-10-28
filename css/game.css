@@ -1,0 +1,25 @@
+/* Style for the camera overlay */
+#cameraOverlay {
+    position: fixed;
+    top: 5%;
+    left: 5%;
+    width: 90%;
+    height: 90%;
+    pointer-events: none; /* Allows interaction with A-Frame */
+    z-index: 9999;
+
+    /* Animation to create subtle movement */
+    animation: slightMove 3s infinite alternate ease-in-out;
+  }
+
+  @keyframes slightMove {
+    0% {
+      transform: translate(0, 0)
+    }
+    50% {
+      transform: translate(5px, -5px)
+    }
+    100% {
+      transform: translate(-5px, 5px)
+    }
+}

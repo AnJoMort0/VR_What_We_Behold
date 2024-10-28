@@ -1,35 +1,25 @@
 <!DOCTYPE html>
 <html>
   <head>
+
+    <link rel="stylesheet" href="css/game.css">
+
+    <!-- External Libraries -->
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.5.2/pixi.min.js"></script>
-    <style>
-      /* Style for the camera overlay */
-      #cameraOverlay {
-        position: fixed;
-        top: 5%;
-        left: 5%;
-        width: 90%;
-        height: 90%;
-        pointer-events: none; /* Allows interaction with A-Frame */
-        z-index: 9999;
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r17/Stats.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/25.0.0/tween.umd.min.js"></script>
+    <script>Ticker.framerate=60; Ticker.paused=true;</script>
+    <script src="js/lib/helpers.js"></script>
 
-        /* Animation to create subtle movement */
-        animation: slightMove 3s infinite alternate ease-in-out;
-      }
+    <!-- Text Strings -->
+    <script src="js/textStrings.js"></script>
 
-      @keyframes slightMove {
-        0% {
-          transform: translate(0, 0)
-        }
-        50% {
-          transform: translate(5px, -5px)
-        }
-        100% {
-          transform: translate(-5px, 5px)
-        }
-      }
-    </style>
+    <!-- Core Engine Code -->
+    <script src="js/core/Game.js"></script>
+    <script src="js/core/SceneManager.js"></script>
+    <script src="js/core/Scene.js"></script>
   </head>
   <body>
     <a-scene fog="type: linear; color: #D3D3D3; near: 20; far: 80">
