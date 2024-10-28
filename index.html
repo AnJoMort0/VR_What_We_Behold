@@ -2,43 +2,51 @@
 <html>
   <head>
 
-    <link rel="stylesheet" href="css/game.css">
+    <link rel = "stylesheet" href = "css/game.css">
 
     <!-- External Libraries -->
-    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.5.2/pixi.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r17/Stats.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/25.0.0/tween.umd.min.js"></script>
-    <script src="js/lib/helpers.js"></script>
-    <script>Ticker.framerate=60; Ticker.paused=true;</script>
+    <script src = "https://aframe.io/releases/1.6.0/aframe.min.js">                         </script>
+    <script src = "https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.5.2/pixi.min.js">       </script>
+    <script src = "https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.js">          </script>
+    <script src = "https://cdnjs.cloudflare.com/ajax/libs/stats.js/r17/Stats.min.js">       </script>
+    <script src = "https://cdnjs.cloudflare.com/ajax/libs/tween.js/25.0.0/tween.umd.min.js"></script>
+    <!--script src = "js/lib/helpers.js">                                                   </script-->
+    <!--script> Ticker.framerate = 60; Ticker.paused = true;                                </script-->
     <!-- Text Strings -->
-    <script src="js/textStrings.js"></script>
+    <script src = "js/textStrings.js"></script>
   </head>
   <body>
-    <a-scene fog="type: linear; color: #D3D3D3; near: 20; far: 80">
+    <a-scene fog = "type: linear; color: #D3D3D3; near: 20; far: 80">
       <!-- Define assets -->
       <a-assets>
-        <img id="ground" src="sprites/ground.png">
+        <img id = "ground"            src= "sprites/ground.png">
+        <img id = "circleNeutralPeep" src= "sprites/peeps/placeholder/circle_neutral_peep.png">
       </a-assets>
 
-      <!-- Camera entity that keeps the player in place -->
-      <a-entity camera look-controls position="0 1.4 0"></a-entity>
+      <!-- Camera entity to keep player in place -->
+      <a-entity camera look-controls position = "0 1.6 0"></a-entity>
 
       <!-- Infinite ground plane -->
       <a-plane 
-        src="#ground" 
-        position="0 0 0" 
-        rotation="-90 0 0" 
-        width="200" 
-        height="200" 
-        material="repeat: 40 40; side: double;">
+        src       = "#ground" 
+        position  = "0 0 0" 
+        rotation  = "-90 0 0" 
+        width     = "200" 
+        height    = "200" 
+        material  = "repeat: 40 40; side: double;">
       </a-plane>
 
-      <a-sky color="#D3D3D3"></a-sky>
+      <!-- Sky to give a sense of openness -->
+      <a-sky color = "#D3D3D3"></a-sky>
+
+      <!-- Placeholder for Peeps -->
+      <a-entity id = "peeps">
+        <a-image 
+          src  = "#circleNeutralPeep" position = "0 1 -5" scale = "1 1 1"></a-image>
+      </a-entity>
     </a-scene>
 
     <!-- Camera overlay -->
-    <img id="cameraOverlay" src="sprites/cam/cam.png">
+    <img id = "cameraOverlay" src = "sprites/cam/cam.png">
   </body>
 </html>
