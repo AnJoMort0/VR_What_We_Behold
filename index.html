@@ -10,6 +10,7 @@
     <script src = "https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.js">          </script>
     <script src = "https://cdnjs.cloudflare.com/ajax/libs/stats.js/r17/Stats.min.js">       </script>
     <script src = "https://cdnjs.cloudflare.com/ajax/libs/tween.js/25.0.0/tween.umd.min.js"></script>
+    <script src = "js/lib/look-at.js">                                                      </script>
     <!--script src = "js/lib/helpers.js">                                                   </script-->
     <!--script> Ticker.framerate = 60; Ticker.paused = true;                                </script-->
     <!-- Text Strings -->
@@ -19,12 +20,13 @@
     <a-scene fog = "type: linear; color: #D3D3D3; near: 20; far: 80">
       <!-- Define assets -->
       <a-assets>
-        <img id = "ground"            src= "sprites/ground.png">
-        <img id = "circleNeutralPeep" src= "sprites/peeps/placeholder/circle_neutral_peep.png">
+        <img id = "ground"            src = "sprites/ground.png">
+        <img id = "circleNeutralPeep" src = "sprites/peeps/placeholder/circle_neutral_peep.png">
+        <img id = "squareNeutralPeep" src = "sprites/peeps/placeholder/square_neutral_peep.png">
       </a-assets>
 
       <!-- Camera entity to keep player in place -->
-      <a-entity camera look-controls position = "0 1.6 0"></a-entity>
+      <a-entity id = "playerCamera" camera look-controls position = "0 1.6 0"></a-entity>
 
       <!-- Infinite ground plane -->
       <a-plane 
@@ -40,13 +42,42 @@
       <a-sky color = "#D3D3D3"></a-sky>
 
       <!-- Placeholder for Peeps -->
-      <a-entity id = "peeps">
-        <a-image 
-          src  = "#circleNeutralPeep" position = "0 1 -5" scale = "1 1 1"></a-image>
-      </a-entity>
+      <a-entity id="peeps"></a-entity>
     </a-scene>
 
     <!-- Camera overlay -->
     <img id = "cameraOverlay" src = "sprites/cam/cam.png">
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        const peepsContainer = document.getElementById("peeps");
+        const playerCamera = document.querySelector("#playerCamera");
+
+        // Function to create a peep entity
+        function createPeep(id, src, position) {
+          const peep = document.createElement("a-image");
+          peep.setAttribute("id", id);
+          peep.setAttribute("src", src);
+          peep.setAttribute("position", position);
+          peep.setAttribute("scale", "1 1 1");
+          peep.setAttribute("look-at", "#playerCamera");
+          peepsContainer.appendChild(peep);
+        }
+
+        // Spawning 10 circle peeps
+        for (let i = 0; i < 10; i++) {
+          const x = (Math.random() * 16) - 8;
+          const z = (Math.random() * 16) - 8;
+          createPeep(`circlePeep${i}`, "#circleNeutralPeep", `${x} 1 ${z}`);
+        }
+
+        // Spawning 10 square peeps
+        for (let i = 0; i < 10; i++) {
+          const x = (Math.random() * 16) - 8;
+          const z = (Math.random() * 16) - 8;
+          createPeep(`squarePeep${i}`, "#squareNeutralPeep", `${x} 1 ${z}`);
+        }
+      });
+    </script>
   </body>
 </html>
