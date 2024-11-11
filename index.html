@@ -61,7 +61,16 @@
           peep.setAttribute("position", position);
           peep.setAttribute("scale", "1 1 1");
           peep.setAttribute("look-at", "#playerCamera");
+          peep.setAttribute("rotation", "0 0 0");
           peepsContainer.appendChild(peep);
+
+          // This is suppose to lock the horizontal axis, but we'll see if it works
+          peep.addEventListener("componentchanged", function (evt) {
+            if (evt.detail.name === "rotation") {
+              const currentRotation = peep.getAttribute("rotation");
+              peep.setAttribute("rotation", `0 ${currentRotation.y} 0`);
+            }
+          });
         }
 
         // Spawning 10 circle peeps
