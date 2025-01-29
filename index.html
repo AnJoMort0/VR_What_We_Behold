@@ -13,11 +13,13 @@
     <script src = "js/lib/look-at.js">                                                      </script>
     <!--script src = "js/lib/helpers.js">                                                   </script-->
     <!--script> Ticker.framerate = 60; Ticker.paused = true;                                </script-->
+
     <!-- Text Strings -->
     <script src = "js/textStrings.js"></script>
+
   </head>
   <body>
-    <a-scene fog = "type: linear; color: #D3D3D3; near: 20; far: 80">
+    <a-scene fog = "type: linear; color: #D3D3D3; near: 20; far: 100">
       <!-- Define assets -->
       <a-assets>
         <img id = "ground"            src = "sprites/ground.png">
@@ -52,6 +54,7 @@
       document.addEventListener("DOMContentLoaded", function() {
         const peepsContainer = document.getElementById("peeps");
         const playerCamera = document.querySelector("#playerCamera");
+        const peeps = [];
 
         // Function to create a peep entity
         function createPeep(id, src, position) {
@@ -71,21 +74,58 @@
               peep.setAttribute("rotation", `0 ${currentRotation.y} 0`);
             }
           });
+
+          peeps.push({
+            el: peep,
+            x: parseFloat(position.split(' ')[0]),
+            y: parseFloat(position.split(' ')[1]),
+            z: parseFloat(position.split(' ')[2]),
+            direction: Math.random() * Math.PI * 2,
+            speed: 0.01 + Math.random() * 0.01
+          });
         }
 
-        // Spawning 10 circle peeps
-        for (let i = 0; i < 10; i++) {
+        // Spawning 5 circle peeps
+        for (let i = 0; i < 5; i++) {
           const x = (Math.random() * 16) - 8;
           const z = (Math.random() * 16) - 8;
           createPeep(`circlePeep${i}`, "#circleNeutralPeep", `${x} 1 ${z}`);
         }
 
-        // Spawning 10 square peeps
-        for (let i = 0; i < 10; i++) {
+        // Spawning 5 square peeps
+        for (let i = 0; i < 5; i++) {
           const x = (Math.random() * 16) - 8;
           const z = (Math.random() * 16) - 8;
           createPeep(`squarePeep${i}`, "#squareNeutralPeep", `${x} 1 ${z}`);
         }
+
+        // Update loop for peeps movement and flipping direction
+        function updatePeeps() {
+          peeps.forEach((peep) => {
+            // Update direction and position
+            peep.x += Math.cos(peep.direction) * peep.speed;
+            peep.z += Math.sin(peep.direction) * peep.speed;
+
+            // Loop the position around if it goes too far
+            if (peep.x < -8) peep.x = 8;
+            if (peep.x > 8) peep.x = -8;
+            if (peep.z < -8) peep.z = 8;
+            if (peep.z > 8) peep.z = -8;
+
+            // Set the new position
+            peep.el.setAttribute("position", `${peep.x} ${peep.y} ${peep.z}`);
+
+            // Flip the peep based on direction
+            const flip = Math.cos(peep.direction) < 0 ? -1 : 1;
+            peep.el.setAttribute("scale", `${flip} 1 1`);
+          });
+
+          // Request the next frame
+          requestAnimationFrame(updatePeeps);
+        }
+
+        // Start the update loop
+        updatePeeps();
       });
     </script>
   </body>
