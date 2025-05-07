@@ -223,7 +223,12 @@
       <a-entity
         id        = "playerCamera"
         camera    = "near:0.1; far:500"
-        look-controls
+        look-controls = "
+            pointerLockEnabled:         true;
+            magicWindowTrackingEnabled: true;
+            mouseEnabled:               true;
+            touchEnabled:               true;
+            "
         camera-tracker
         position  = "0 1.6 0"
       ></a-entity>
