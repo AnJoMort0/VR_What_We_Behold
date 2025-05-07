@@ -12,6 +12,73 @@
       const PEEP_DEFAULT_SPEED  = 0.015;
 
       /**
+       * PHOTO-CAPTURE COMPONENT
+       * Grabs a snippet of the canva in GPU and shows it on click
+       * heavily chatGPT assisted
+       */
+      AFRAME.registerComponent('photo-capture', {
+        init: function () {
+          const sceneEl    = this.el.sceneEl;
+          const renderer   = sceneEl.renderer;
+          const camera     = sceneEl.camera;
+          const overlayImg = document.getElementById('cameraOverlay');
+
+          // 1) Create small GPU RenderTarget
+          const rtW = Math.floor(window.innerWidth * 0.3);
+          const rtH = Math.floor(window.innerHeight * 0.5);
+          const renderTarget = new THREE.WebGLRenderTarget(rtW, rtH);
+
+          // 2) Create the plane that will show the "photo" in front of the camera
+          const planeEl = document.createElement('a-plane');
+          planeEl.setAttribute('visible', 'false');
+          planeEl.setAttribute('width',  '0.4');
+          planeEl.setAttribute('height', '0.5');
+          planeEl.setAttribute('position','0 0 -0.8');
+          this.el.appendChild(planeEl);
+
+          // Grab the Three.js mesh once it’s loaded
+          let planeMesh = null;
+          planeEl.addEventListener('loaded', () => {
+            planeMesh = planeEl.getObject3D('mesh');
+          });
+
+          // 3) On click, crop & render just the overlay region into our RenderTarget and show it
+          window.addEventListener('click', () => {
+            if (!planeMesh) return;  // bail until mesh is ready
+
+            // Compute overlay rect in WebGL pixels
+            const canvas  = renderer.domElement;
+            const fullW   = canvas.width;
+            const fullH   = canvas.height;
+            const rect    = overlayImg.getBoundingClientRect();
+            const dpr     = window.devicePixelRatio || 1;
+            const offsetX = rect.left   * dpr;
+            const offsetY = rect.top    * dpr;
+            const cropW   = rect.width  * dpr;
+            const cropH   = rect.height * dpr;
+            const vY      = fullH - offsetY - cropH; // bottom-based
+
+            // Tell the camera to render just that sub-frustum
+            camera.setViewOffset(fullW, fullH, offsetX, vY, cropW, cropH);
+
+            // Render into our small RT (GPU only)
+            renderer.setRenderTarget(renderTarget);
+            renderer.clear();
+            renderer.render(sceneEl.object3D, camera);
+            renderer.setRenderTarget(null);
+
+            // Restore full-screen camera
+            camera.clearViewOffset();
+
+            // Update the plane’s texture and show it
+            planeMesh.material.map         = renderTarget.texture;
+            planeMesh.material.needsUpdate = true;
+            planeEl.setAttribute('visible', 'true');
+          });
+        }
+      });
+
+      /**
        * CAMERA-TRACKER COMPONENT
        * Projects every peep into screen-space and logs those whose coordinates fall inside the cameraOverlay element.
        * Heavily chatGPT assisted because I was propper stuck.
@@ -230,6 +297,7 @@
             touchEnabled:               true;
             "
         camera-tracker
+        photo-capture
         position  = "0 1.6 0"
       ></a-entity>
 
