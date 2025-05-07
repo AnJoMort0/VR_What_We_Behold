@@ -1,132 +1,257 @@
 <!DOCTYPE html>
 <html>
   <head>
-
-    <link rel = "stylesheet" href = "css/game.css">
-
-    <!-- External Libraries -->
-    <script src = "https://aframe.io/releases/1.6.0/aframe.min.js">                         </script>
-    <script src = "https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.5.2/pixi.min.js">       </script>
-    <script src = "https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.js">          </script>
-    <script src = "https://cdnjs.cloudflare.com/ajax/libs/stats.js/r17/Stats.min.js">       </script>
-    <script src = "https://cdnjs.cloudflare.com/ajax/libs/tween.js/25.0.0/tween.umd.min.js"></script>
-    <script src = "js/lib/look-at.js">                                                      </script>
-    <!--script src = "js/lib/helpers.js">                                                   </script-->
-    <!--script> Ticker.framerate = 60; Ticker.paused = true;                                </script-->
-
-    <!-- Text Strings -->
-    <script src = "js/textStrings.js"></script>
-
-  </head>
-  <body>
-    <a-scene fog = "type: linear; color: #D3D3D3; near: 20; far: 100">
-      <!-- Define assets -->
-      <a-assets>
-        <img id = "ground"            src = "sprites/ground.png">
-        <img id = "circleNeutralPeep" src = "sprites/peeps/placeholder/circle_neutral_peep.png">
-        <img id = "squareNeutralPeep" src = "sprites/peeps/placeholder/square_neutral_peep.png">
-      </a-assets>
-
-      <!-- Camera entity to keep player in place -->
-      <a-entity id = "playerCamera" camera look-controls position = "0 1.6 0"></a-entity>
-
-      <!-- Infinite ground plane -->
-      <a-plane 
-        src       = "#ground" 
-        position  = "0 0 0" 
-        rotation  = "-90 0 0" 
-        width     = "200" 
-        height    = "200" 
-        material  = "repeat: 40 40; side: double;">
-      </a-plane>
-
-      <!-- Sky to give a sense of openness -->
-      <a-sky color = "#D3D3D3"></a-sky>
-
-      <!-- Placeholder for Peeps -->
-      <a-entity id="peeps"></a-entity>
-    </a-scene>
-
-    <!-- Camera overlay -->
-    <img id = "cameraOverlay" src = "sprites/cam/cam.png">
+    <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+    <link   rel="stylesheet" href="css/game.css">
+    <script src="js/textStrings.js"></script>
 
     <script>
-      document.addEventListener("DOMContentLoaded", function() {
-        const peepsContainer = document.getElementById("peeps");
-        const playerCamera = document.querySelector("#playerCamera");
-        const peeps = [];
+      // GENERAL VALUES
+      const PEEP_SPAWN_COUNT    = 12;
+      const PEEP_SPAWN_RADIUS   = 8;
+      const PEEP_DEFAULT_SPEED  = 0.015;
 
-        // Function to create a peep entity
-        function createPeep(id, src, position) {
-          const peep = document.createElement("a-image");
-          peep.setAttribute("id", id);
-          peep.setAttribute("src", src);
-          peep.setAttribute("position", position);
-          peep.setAttribute("scale", "1 1 1");
-          peep.setAttribute("look-at", "#playerCamera");
-          peep.setAttribute("rotation", "0 0 0");
-          peepsContainer.appendChild(peep);
+      /**
+       * CAMERA-TRACKER COMPONENT
+       * Projects every peep into screen-space and logs those whose coordinates fall inside the cameraOverlay element.
+       * Heavily chatGPT assisted because I was propper stuck.
+       */
+       AFRAME.registerComponent('camera-tracker', {
+        init: function () {
+          // Grab Three.js camera and the overlay DOM element
+          this.threeCam = this.el.sceneEl.camera;
+          this.overlay  = document.getElementById('cameraOverlay');
+        },
+        tick: function () {
+          if (!this.threeCam || !this.overlay) return;
 
-          // This is suppose to lock the horizontal axis, but we'll see if it works
-          peep.addEventListener("componentchanged", function (evt) {
-            if (evt.detail.name === "rotation") {
-              const currentRotation = peep.getAttribute("rotation");
-              peep.setAttribute("rotation", `0 ${currentRotation.y} 0`);
+          // Get overlay pixel bounds
+          const rect = this.overlay.getBoundingClientRect();
+          // Find all peeps by data attribute
+          const peeps = this.el.sceneEl.querySelectorAll('[data-peep-type]');
+          peeps.forEach(peep => {
+            // 1) World position
+            const worldPos = new THREE.Vector3();
+            peep.object3D.getWorldPosition(worldPos);
+            // 2) Project to normalized device coords
+            worldPos.project(this.threeCam);
+            // 3) Convert to screen pixels
+            const x = (worldPos.x + 1) / 2 * window.innerWidth;
+            const y = (1 - worldPos.y) / 2 * window.innerHeight;
+            // 4) If inside overlay, log it
+            if (
+              x >= rect.left &&
+              x <= rect.right &&
+              y >= rect.top &&
+              y <= rect.bottom
+            ) {
+              console.log(
+                `Peep in overlay → id=${peep.id}, type=${peep.dataset.peepType}`
+              );
             }
           });
-
-          peeps.push({
-            el: peep,
-            x: parseFloat(position.split(' ')[0]),
-            y: parseFloat(position.split(' ')[1]),
-            z: parseFloat(position.split(' ')[2]),
-            direction: Math.random() * Math.PI * 2,
-            speed: 0.01 + Math.random() * 0.01
-          });
         }
+      });
 
-        // Spawning 5 circle peeps
-        for (let i = 0; i < 5; i++) {
-          const x = (Math.random() * 16) - 8;
-          const z = (Math.random() * 16) - 8;
-          createPeep(`circlePeep${i}`, "#circleNeutralPeep", `${x} 1 ${z}`);
+      /**
+       * PEEP-MOVER COMPONENT
+       * Moves the peep randomly in the XZ plane, bounces back when leaving radius, and flips entity horizontally based on movement direction.
+       * Moderately chatGPT assisted.
+       */
+      AFRAME.registerComponent('peep-mover', {
+        schema: {
+          speed:  { type: 'number', default: PEEP_DEFAULT_SPEED },
+          radius: { type: 'number', default: PEEP_SPAWN_RADIUS }
+        },
+        init: function () {
+          // Initialize a random movement direction
+          this.direction = Math.random() * 2 * Math.PI;
+        },
+        tick: function (time, delta) {
+          const pos     = this.el.object3D.position;
+          const prevPos = pos.clone(); // this is needed to make sure peeps face the correct direction
+          // Move in direction, scaled by delta
+          const moveAmt = this.data.speed * (delta / 16);
+          const dx      = Math.cos(this.direction) * moveAmt;
+          const dz      = Math.sin(this.direction) * moveAmt;
+          pos.x += dx;
+          pos.z += dz;
+
+          // Bouce at boundaries
+          const r = this.data.radius;
+          if (pos.x > r) {
+            pos.x = r;
+            this.direction = Math.PI - this.direction;
+          }
+          if (pos.x < -r) {
+            pos.x = -r;
+            this.direction = Math.PI - this.direction;
+          }
+          if (pos.z > r) {
+            pos.z = r;
+            this.direction = -this.direction;
+          }
+          if (pos.z < -r) {
+            pos.z = -r;
+            this.direction = -this.direction;
+          }
+
+          this.el.object3D.position.copy(pos);
+
+          // — NEW FLIP LOGIC, heavily chatGPT assisted — project both positions to camera NDC
+          const cam     = this.el.sceneEl.camera;
+          const ndcPrev = prevPos.clone().project(cam);
+          const ndcCurr = pos.clone().project(cam);
+          // if it moved right on screen, keep scale=1; otherwise flip
+          let flip;
+          if (ndcCurr.x > ndcPrev.x) {
+              flip = 1;
+          } else {
+              flip = -1;
+          }
+          this.el.setAttribute('scale', `${flip} 1 1`);
         }
+      });
 
-        // Spawning 5 square peeps
-        for (let i = 0; i < 5; i++) {
-          const x = (Math.random() * 16) - 8;
-          const z = (Math.random() * 16) - 8;
-          createPeep(`squarePeep${i}`, "#squareNeutralPeep", `${x} 1 ${z}`);
+      /**
+       * BILLBOARD COMPONENT
+       * Rotates the entity around the Y axis so its front face always faces the camera, keeping the sprite upright on the XZ plane.
+       * Heavily chatGPT assisted, it fixed my 'look-at-y' component that was not working properly
+       */
+      AFRAME.registerComponent('billboard', {
+        tick: function () {
+          const camera  = this.el.sceneEl.camera;
+          const obj     = this.el.object3D;
+          // Get world positions
+          const camPos  = new THREE.Vector3();
+          camera.getWorldPosition(camPos);
+          const pos     = obj.position;
+
+          // Compute angle on XZ plane and set Y rotation
+          const dx = camPos.x - obj.position.x;
+          const dz = camPos.z - obj.position.z;
+          const angle = Math.atan2(dx, dz);
+          const deg   = THREE.MathUtils.radToDeg(angle);
+          this.el.setAttribute('rotation', { x: 0, y: deg, z: 0 });
         }
+      });
 
-        // Update loop for peeps movement and flipping direction
-        function updatePeeps() {
-          peeps.forEach((peep) => {
-            // Update direction and position
-            peep.x += Math.cos(peep.direction) * peep.speed;
-            peep.z += Math.sin(peep.direction) * peep.speed;
+      /**
+       * NO-FRUSTUM-CULLL COMPONENT
+       * Disables frustum culling on the mesh so entities don't vanish when out of view bounds
+       * Fully chatGPT generated, I have no idea how this works, that's how it fixed the peeps disappearing out of bounds
+       */
+       AFRAME.registerComponent('no-frustum-cull', {
+          init: function () {
+            this.el.addEventListener('loaded', () => {
+              this.el.object3D.traverse(node => {
+                if (node.isMesh) node.frustumCulled = false;
+              });
+            });
+          }
+        });
 
-            // Loop the position around if it goes too far
-            if (peep.x < -8) peep.x = 8;
-            if (peep.x > 8) peep.x = -8;
-            if (peep.z < -8) peep.z = 8;
-            if (peep.z > 8) peep.z = -8;
+      /**
+       * PEEP-MANAGER COMPONENT
+       * Spawns a number of peeps, with tags, id and data-peep-type, and attaches mover + billboard + no-frustum-cull.
+       * chatGPT assisted
+       */
+       AFRAME.registerComponent('peep-manager', {
+        schema: {
+          count: { type: 'int', default: PEEP_SPAWN_COUNT },
+          radius: { type: 'number', default: PEEP_SPAWN_RADIUS },
+          assetPrefix: { type: 'string', default: '#' }
+        },
+        init: function () {
+          const half = this.data.count / 2;
+          for (let i = 0; i < this.data.count; i++) {
+            let type;
+            if (i < half) {
+              type = 'circle';
+            } else {
+              type = 'square';
+            }
 
-            // Set the new position
-            peep.el.setAttribute("position", `${peep.x} ${peep.y} ${peep.z}`);
+            let spriteId;
+            if (type === 'circle') {
+              spriteId = 'circleNeutralPeep';
+            } else {
+              spriteId = 'squareNeutralPeep';
+            }
 
-            // Flip the peep based on direction
-            const flip = Math.cos(peep.direction) < 0 ? -1 : 1;
-            peep.el.setAttribute("scale", `${flip} 1 1`);
-          });
+            const peepEl = document.createElement('a-image');
 
-          // Request the next frame
-          requestAnimationFrame(updatePeeps);
+            // Unique ID and type tag, this is used to know what peeps are in front of the camera
+            peepEl.setAttribute('id', `peep-${type}-${i}`);
+            peepEl.setAttribute('data-peep-type', type);
+
+            // Random XZ within radius, Y = 1
+            const angle   = Math.random() * 2 * Math.PI;
+            const dist    = Math.random() * this.data.radius;
+            const x = dist * Math.cos(angle);
+            const z = dist * Math.sin(angle);
+            peepEl.setAttribute('position', `${x} 1 ${z}`);
+            peepEl.setAttribute('src', this.data.assetPrefix + spriteId);
+
+            // Add behaviors
+            peepEl.setAttribute('billboard', '');
+            peepEl.setAttribute(
+              'peep-mover',
+              `speed: ${0.01 + Math.random() * 0.01}; radius: ${
+                this.data.radius
+              }`
+            );
+            peepEl.setAttribute('no-frustum-cull', '');
+
+            this.el.appendChild(peepEl);
+          }
         }
-
-        // Start the update loop
-        updatePeeps();
       });
     </script>
+  </head>
+
+  <body>
+    <a-scene fog="type: linear; color: #D3D3D3; near: 20; far: 100">
+      <!-- Assets -->
+      <a-assets>
+        <img id = "ground"            src = "sprites/ground.png" />
+        <img id = "circleNeutralPeep" src = "sprites/peeps/placeholder/circle_neutral_peep.png" />
+        <img id = "squareNeutralPeep" src = "sprites/peeps/placeholder/square_neutral_peep.png" />
+      </a-assets>
+
+      <!-- Player camera -->
+      <a-entity
+        id        = "playerCamera"
+        camera    = "near:0.1; far:500"
+        look-controls
+        camera-tracker
+        position  = "0 1.6 0"
+      ></a-entity>
+
+      <!-- Infinite ground plane -->
+      <a-plane
+        src       = "#ground"
+        rotation  = "-90 0 0"
+        width     = "200"
+        height    = "200"
+        material  = "repeat: 40 40; side: double">
+      </a-plane>
+
+      <!-- Sky background -->
+      <a-sky color="#D3D3D3"></a-sky>
+
+      <!-- Peep spawner -->
+      <a-entity
+        id        = "peeps"
+        peep-manager
+      ></a-entity>
+    </a-scene>
+
+    <!-- Camera overlay HUD -->
+    <img
+      id        = "cameraOverlay"
+      src       = "sprites/cam/cam.png"
+      alt       = "Camera Overlay should be here"
+    />
   </body>
 </html>
