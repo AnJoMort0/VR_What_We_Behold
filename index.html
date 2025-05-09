@@ -11,6 +11,46 @@
       const PEEP_SPAWN_RADIUS   = 8;
       const PEEP_DEFAULT_SPEED  = 0.015;
 
+      AFRAME.registerComponent('debug-toggle', { // chatGPT assisted
+        init: function () {
+          window.DEBUG = false;
+
+          // peep id labels
+          const updateLabels = show => {
+            document.querySelectorAll('.debug-label')
+              .forEach(el => el.setAttribute('visible', show));
+          };
+
+          // Toggle on “D” key
+          window.addEventListener('keydown', e => {
+            if (e.key.toLowerCase() === 'd') {
+              window.DEBUG = !window.DEBUG;
+              updateLabels(window.DEBUG);
+              console.log('Debug mode:', window.DEBUG ? 'ON' : 'OFF');
+            }
+          });
+
+          // Toggle on gamepad D-pad Up (standard button index 12)
+          this.upPressed = false;
+          this.tick = () => {
+            const gps = navigator.getGamepads && navigator.getGamepads();
+            if (!gps) return;
+            for (const gp of gps) {
+              if (!gp || !gp.buttons[12]) continue;
+              const btn = gp.buttons[12];
+              if (btn.pressed && !this.upPressed) {
+                window.DEBUG = !window.DEBUG;
+                updateLabels(window.DEBUG);
+                console.log('Debug mode:', window.DEBUG ? 'ON' : 'OFF');
+                this.upPressed = true;
+              } else if (!btn.pressed) {
+                this.upPressed = false;
+              }
+            }
+          };
+        }
+      });
+
       /**
        * PHOTO-CAPTURE COMPONENT
        * Grabs a snippet of the canva in GPU and shows it on click
@@ -29,7 +69,55 @@
           const renderTarget = new THREE.WebGLRenderTarget(rtW, rtH);
 
           // 2) On click: crop, render, read back & stamp into an HTML <img>
-          window.addEventListener('click', () => {
+          this.handleCapture = () => {
+            // Capture information about the peeps inbound
+            const overlayRect = frameImg.getBoundingClientRect();
+
+            const camWorldPos = new THREE.Vector3();
+            camera.getWorldPosition(camWorldPos);
+            const camDir = new THREE.Vector3();
+            camera.getWorldDirection(camDir); // unit vector pointing “out” of the camera to prevent capturing the peeps behind the camera as well
+            
+            const captured    = [];
+
+            this.el.sceneEl.querySelectorAll('[data-peep-type]').forEach(peepEl => {
+              // world‐space position
+              const worldPos = new THREE.Vector3();
+              peepEl.object3D.getWorldPosition(worldPos);
+
+              // Cull any peep behind the camera
+              const toPeep = worldPos.clone().sub(camWorldPos);
+              if (camDir.dot(toPeep) <= 0) {
+                return; // skip those behind
+              }
+
+              // project to NDC and then to screen px
+              const ndc   = worldPos.clone().project(camera);
+              const x     = (ndc.x + 1) / 2 * window.innerWidth;
+              const y     = (1 - ndc.y) / 2 * window.innerHeight;
+              // test inclusion
+              if (
+                x >= overlayRect.left &&
+                x <= overlayRect.right &&
+                y >= overlayRect.top &&
+                y <= overlayRect.bottom
+              ) {
+                const distance = worldPos.distanceTo(camWorldPos);
+                captured.push({
+                  id:       peepEl.id,
+                  type:     peepEl.dataset.peepType,
+                  distance: distance
+                });
+              }
+            });
+
+            // store results
+            this.capturedPeeps        = captured;
+            window.lastCapturedPeeps  = captured;
+            //console.log('Captured peeps:', captured);
+            console.log('Captured peep IDs:', captured.map(peep => peep.id));
+
+            //Keep going with the photo capture generation
             // a) Measure CSS overlay bounds & convert to WebGL pixels
             const rect    = frameImg.getBoundingClientRect();
             const dpr     = window.devicePixelRatio || 1;
@@ -76,49 +164,36 @@
               document.body.appendChild(snap);
             }
             snap.src = tmp.toDataURL('image/png');
-          });
-        }
-      });
+          };
 
-      /**
-       * CAMERA-TRACKER COMPONENT
-       * Projects every peep into screen-space and logs those whose coordinates fall inside the cameraOverlay element.
-       * Heavily chatGPT assisted because I was propper stuck.
-       */
-       AFRAME.registerComponent('camera-tracker', {
-        init: function () {
-          // Grab Three.js camera and the overlay DOM element
-          this.threeCam = this.el.sceneEl.camera;
-          this.overlay  = document.getElementById('cameraOverlay');
-        },
-        tick: function () {
-          if (!this.threeCam || !this.overlay) return;
-
-          // Get overlay pixel bounds
-          const rect = this.overlay.getBoundingClientRect();
-          // Find all peeps by data attribute
-          const peeps = this.el.sceneEl.querySelectorAll('[data-peep-type]');
-          peeps.forEach(peep => {
-            // 1) World position
-            const worldPos = new THREE.Vector3();
-            peep.object3D.getWorldPosition(worldPos);
-            // 2) Project to normalized device coords
-            worldPos.project(this.threeCam);
-            // 3) Convert to screen pixels
-            const x = (worldPos.x + 1) / 2 * window.innerWidth;
-            const y = (1 - worldPos.y) / 2 * window.innerHeight;
-            // 4) If inside overlay, log it
-            if (
-              x >= rect.left &&
-              x <= rect.right &&
-              y >= rect.top &&
-              y <= rect.bottom
-            ) {
-              console.log(
-                `Peep in overlay → id=${peep.id}, type=${peep.dataset.peepType}`
-              );
+          // Read the triggers for all devices
+          // mouse & touch
+          window.addEventListener('click',        this.handleCapture);
+          // Vive/Wand/Quest remotes
+          sceneEl.addEventListener('triggerdown', this.handleCapture);
+          // WebXR “select” for generic controllers (and Oculus Go clickpad)
+          sceneEl.addEventListener('selectstart', this.handleCapture);
+           // Prepare to poll gamepad buttons 0–7 (A,B,X,Y,L1,R1,L2,R2) because nothing was working before for my Switch gamepad
+            this.prevGP = {};  // track previous pressed state by button index
+          },
+          tick: function () {
+            // Poll connected gamepads
+            const gps = navigator.getGamepads && navigator.getGamepads();
+            if (!gps) return;
+            for (const gp of gps) {
+              if (!gp || !gp.buttons) continue;
+              // Only watch standard face & shoulder buttons
+              [0,1,2,3,4,5,6,7].forEach(idx => {
+                const btn = gp.buttons[idx];
+                if (!btn) return;
+                // on newly pressed
+                if (btn.pressed && !this.prevGP[idx]) {
+                  this.handleCapture();
+                }
+                // save for next frame
+                this.prevGP[idx] = btn.pressed;
+              });
             }
-          });
         }
       });
 
@@ -275,6 +350,17 @@
             );
             peepEl.setAttribute('no-frustum-cull', '');
 
+            // --- DEBUG: Floating ID label over each peep - chatGPT generated ---
+            const labelEl = document.createElement('a-entity');
+            labelEl.classList.add('debug-label');
+            labelEl.setAttribute('text',
+              `value: ${peepEl.id}; align: center; width: 2; color: #000`);
+            labelEl.setAttribute('position', '0 0.5 0');   // slightly above the head
+            labelEl.setAttribute('billboard', '');         // always face camera
+            labelEl.setAttribute('visible', false);        // start hidden
+            peepEl.appendChild(labelEl);
+            // ----------------------------------------------
+
             this.el.appendChild(peepEl);
           }
         }
@@ -283,7 +369,7 @@
   </head>
 
   <body>
-    <a-scene fog="type: linear; color: #D3D3D3; near: 20; far: 100">
+    <a-scene debug-toggle fog="type: linear; color: #D3D3D3; near: 20; far: 100">
       <!-- Assets -->
       <a-assets>
         <img id = "ground"            src = "sprites/ground.png" />
