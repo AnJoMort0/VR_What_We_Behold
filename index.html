@@ -59,21 +59,20 @@
         init: function () {
           const sceneEl    = this.el.sceneEl;
           const renderer   = sceneEl.renderer;
-          const camera     = sceneEl.camera;
+          // Grab the *entity* camera (always the monoscopic one), not the scene’s XR ArrayCamera.
+          const cameraEl = this.el.getObject3D('camera');
 
           const finderFrameEl = sceneEl.querySelector('#finderFrame');
           const photoPlaneEl  = sceneEl.querySelector('#photoPlane');
 
-          // 1) Prepare a small GPU render‐target at overlay size
-          const planeW = parseFloat(photoPlaneEl.getAttribute('width'));
-          const planeH = parseFloat(photoPlaneEl.getAttribute('height'));
-          // pick 30% of screen width for your crop
+          // Compute RT size so its aspect matches the plane's
+          const pw = parseFloat(photoPlaneEl.getAttribute('width'));
+          const ph = parseFloat(photoPlaneEl.getAttribute('height'));
           const rtW = Math.floor(window.innerWidth  * 0.3);
-          // derive height so rtW/rtH == planeW/planeH
-          const rtH = Math.floor(rtW * (planeH / planeW));
+          const rtH = Math.floor(rtW * (ph / pw));
           const renderTarget = new THREE.WebGLRenderTarget(rtW, rtH);
 
-          // Grab the Three.js mesh for swapping the texture
+          // Grab the Three.js mesh for the plane
           let photoMesh = photoPlaneEl.getObject3D('mesh');
           photoPlaneEl.addEventListener('object3dset', evt => {
             if (evt.detail.type === 'mesh') {
@@ -81,79 +80,80 @@
             }
           });
 
-          // 2) On click: crop, render, read back & stamp into an HTML <img>
+          // On click: crop, render, read back & stamp into an HTML <img>
           this.handleCapture = () => {
-            // Hide HUD
+            // 1) Hide HUD so it doesn't appear in the shot
             finderFrameEl.setAttribute('visible', false);
             photoPlaneEl.setAttribute('visible', false);
-            // Capture information about the peeps inbound
-            const camWorldPos = new THREE.Vector3();
-            camera.getWorldPosition(camWorldPos);
-            const camDir = new THREE.Vector3();
-            camera.getWorldDirection(camDir); // unit vector pointing “out” of the camera to prevent capturing the peeps behind the camera as well
-            
-            const captured    = [];
+             // 2) Compute world & screen metrics
+            const fullW = renderer.domElement.width;
+            const fullH = renderer.domElement.height;
+            const left  = (fullW - rtW) / 2;
+            const top   = (fullH - rtH) / 2;
 
-            const left   = (window.innerWidth  - rtW) / 2;
-            const top    = (window.innerHeight - rtH) / 2;
+            // 3) “Which peeps” logic (using fullW/fullH for consistency)
+            const camPos = new THREE.Vector3();
+            cameraEl.getWorldPosition(camPos);
+            const camDir = new THREE.Vector3();
+            cameraEl.getWorldDirection(camDir);
+
+            const captured = [];
             sceneEl.querySelectorAll('[data-peep-type]').forEach(peepEl => {
               const worldPos = new THREE.Vector3();
               peepEl.object3D.getWorldPosition(worldPos);
 
-              // Cull any peep behind the camera
-              const toPeep = worldPos.clone().sub(camWorldPos);
-              if (camDir.dot(toPeep) <= 0) {
-                return; // skip those behind
-              }
+              // Cull behind camera
+              if (camDir.dot(worldPos.clone().sub(camPos)) <= 0) return;
 
-              // project to NDC and then to screen px
-              const ndc   = worldPos.clone().project(camera);
-              const x     = (ndc.x + 1) / 2 * window.innerWidth;
-              const y     = (1 - ndc.y) / 2 * window.innerHeight;
-               // if inside the centered crop region
-              if (x >= left && x <= left + rtW &&
-                  y >= top  && y <= top  + rtH) {
-                const distance = worldPos.distanceTo(camWorldPos);
+              // Project into the same buffer coords
+              const ndc = worldPos.clone().project(cameraEl);
+              const x   = (ndc.x + 1) / 2 * fullW;
+              const y   = (1 - ndc.y) / 2 * fullH;
+
+              if (x >= left && x <= left + rtW && y >= top && y <= top + rtH) {
                 captured.push({
                   id:       peepEl.id,
                   type:     peepEl.dataset.peepType,
-                  distance: distance
+                  distance: worldPos.distanceTo(camPos)
                 });
               }
             });
 
-            // store results
-            this.capturedPeeps        = captured;
-            window.lastCapturedPeeps  = captured;
-            console.log('Captured peeps:', captured);
-            console.log('Captured peep IDs:', captured.map(p => p.id).join(', '));
+            // 4) Temporarily disable XR so we render monoscopic into RT
+            const wasXR = renderer.xr.enabled;
+            renderer.xr.enabled = false;
 
-            //Keep going with the photo capture generation
-            const fullW   = renderer.domElement.width;
-            const fullH   = renderer.domElement.height;
-            const offsetX = (fullW - rtW) / 2;
-            const offsetY = (fullH - rtH) / 2;
-            const vY      = fullH - offsetY - rtH;
+              // 4.1) Force camera aspect to match the RT (because of POV being wrong when VR mode is on)
+              const prevAspect = cameraEl.aspect;
+              cameraEl.aspect = fullW / fullH;
+              cameraEl.updateProjectionMatrix();
 
-            camera.setViewOffset(fullW, fullH, offsetX, vY, rtW, rtH);
+            // 5) Do the sub-frustum render
+            cameraEl.setViewOffset(fullW, fullH, left, fullH - top - rtH, rtW, rtH);
             renderer.setRenderTarget(renderTarget);
             renderer.clear();
-            renderer.render(sceneEl.object3D, camera);
+            renderer.render(sceneEl.object3D, cameraEl);
             renderer.setRenderTarget(null);
-            camera.clearViewOffset();
+            cameraEl.clearViewOffset();
 
-            // Swap into the in-scene plane
+              // 5.1) Restore the original camera aspect
+              cameraEl.aspect = prevAspect;
+              cameraEl.updateProjectionMatrix();
+
+            // 6) Restore XR mode
+            renderer.xr.enabled = wasXR;
+
+            // 7) Blit it onto the photo-plane
             if (photoMesh) {
               photoMesh.material.map         = renderTarget.texture;
               photoMesh.material.needsUpdate = true;
               photoPlaneEl.setAttribute('visible', true);
             } else {
-              console.warn('photoPlane mesh not yet available');
+              console.warn('photoPlane mesh not ready');
             }
 
-            // Reappear HUD
+            // 8) Show HUD again
             finderFrameEl.setAttribute('visible', true);
-
           };
 
           // Read the triggers for all devices
@@ -292,9 +292,9 @@
        */
        AFRAME.registerComponent('peep-manager', {
         schema: {
-          count: { type: 'int', default: PEEP_SPAWN_COUNT },
-          radius: { type: 'number', default: PEEP_SPAWN_RADIUS },
-          assetPrefix: { type: 'string', default: '#' }
+          count:        { type: 'int',    default: PEEP_SPAWN_COUNT },
+          radius:       { type: 'number', default: PEEP_SPAWN_RADIUS },
+          assetPrefix:  { type: 'string', default: '#' }
         },
         init: function () {
           const half = this.data.count / 2;
@@ -316,7 +316,7 @@
             const peepEl = document.createElement('a-image');
 
             // Unique ID and type tag, this is used to know what peeps are in front of the camera
-            peepEl.setAttribute('id', `peep-${type}-${i}`);
+            peepEl.setAttribute('id', `${type}-${i}`);
             peepEl.setAttribute('data-peep-type', type);
 
             // Random XZ within radius, Y = 1
