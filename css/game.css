@@ -5,13 +5,26 @@
   left: 50%;
   transform: translate(-50%, -50%);
   
-  width: 30vh;
+  width: 40vh;
   aspect-ratio: 4 / 5; 
   
   pointer-events: none;   /* allow clicking through */
-  z-index: 9999;
+  z-index: 1000;
   
   animation: slightMove 3s infinite alternate ease-in-out;
+}
+
+#photoOverlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scaleY(-1); /* flip horizontally */
+
+  width: 40vh;
+  aspect-ratio: 4 / 5;
+  
+  pointer-events: none;
+  z-index: 1001;
 }
 
 /* your existing keyframes can stay */
