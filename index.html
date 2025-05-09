@@ -2,7 +2,6 @@
 <html>
   <head>
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-    <link   rel="stylesheet" href="css/game.css">
     <script src="js/textStrings.js"></script>
 
     <script>
@@ -61,18 +60,33 @@
           const sceneEl    = this.el.sceneEl;
           const renderer   = sceneEl.renderer;
           const camera     = sceneEl.camera;
-          const frameImg   = document.getElementById('cameraOverlay');
+
+          const finderFrameEl = sceneEl.querySelector('#finderFrame');
+          const photoPlaneEl  = sceneEl.querySelector('#photoPlane');
 
           // 1) Prepare a small GPU render‐target at overlay size
+          const planeW = parseFloat(photoPlaneEl.getAttribute('width'));
+          const planeH = parseFloat(photoPlaneEl.getAttribute('height'));
+          // pick 30% of screen width for your crop
           const rtW = Math.floor(window.innerWidth  * 0.3);
-          const rtH = Math.floor(window.innerHeight * 0.5);
+          // derive height so rtW/rtH == planeW/planeH
+          const rtH = Math.floor(rtW * (planeH / planeW));
           const renderTarget = new THREE.WebGLRenderTarget(rtW, rtH);
+
+          // Grab the Three.js mesh for swapping the texture
+          let photoMesh = photoPlaneEl.getObject3D('mesh');
+          photoPlaneEl.addEventListener('object3dset', evt => {
+            if (evt.detail.type === 'mesh') {
+              photoMesh = evt.detail.object3D;
+            }
+          });
 
           // 2) On click: crop, render, read back & stamp into an HTML <img>
           this.handleCapture = () => {
+            // Hide HUD
+            finderFrameEl.setAttribute('visible', false);
+            photoPlaneEl.setAttribute('visible', false);
             // Capture information about the peeps inbound
-            const overlayRect = frameImg.getBoundingClientRect();
-
             const camWorldPos = new THREE.Vector3();
             camera.getWorldPosition(camWorldPos);
             const camDir = new THREE.Vector3();
@@ -80,8 +94,9 @@
             
             const captured    = [];
 
-            this.el.sceneEl.querySelectorAll('[data-peep-type]').forEach(peepEl => {
-              // world‐space position
+            const left   = (window.innerWidth  - rtW) / 2;
+            const top    = (window.innerHeight - rtH) / 2;
+            sceneEl.querySelectorAll('[data-peep-type]').forEach(peepEl => {
               const worldPos = new THREE.Vector3();
               peepEl.object3D.getWorldPosition(worldPos);
 
@@ -95,13 +110,9 @@
               const ndc   = worldPos.clone().project(camera);
               const x     = (ndc.x + 1) / 2 * window.innerWidth;
               const y     = (1 - ndc.y) / 2 * window.innerHeight;
-              // test inclusion
-              if (
-                x >= overlayRect.left &&
-                x <= overlayRect.right &&
-                y >= overlayRect.top &&
-                y <= overlayRect.bottom
-              ) {
+               // if inside the centered crop region
+              if (x >= left && x <= left + rtW &&
+                  y >= top  && y <= top  + rtH) {
                 const distance = worldPos.distanceTo(camWorldPos);
                 captured.push({
                   id:       peepEl.id,
@@ -114,56 +125,35 @@
             // store results
             this.capturedPeeps        = captured;
             window.lastCapturedPeeps  = captured;
-            //console.log('Captured peeps:', captured);
-            console.log('Captured peep IDs:', captured.map(peep => peep.id));
+            console.log('Captured peeps:', captured);
+            console.log('Captured peep IDs:', captured.map(p => p.id).join(', '));
 
             //Keep going with the photo capture generation
-            // a) Measure CSS overlay bounds & convert to WebGL pixels
-            const rect    = frameImg.getBoundingClientRect();
-            const dpr     = window.devicePixelRatio || 1;
             const fullW   = renderer.domElement.width;
             const fullH   = renderer.domElement.height;
-            const offsetX = rect.left   * dpr;
-            const offsetY = rect.top    * dpr;
-            const cropW   = rect.width  * dpr;
-            const cropH   = rect.height * dpr;
-            const vY      = fullH - offsetY - cropH;
+            const offsetX = (fullW - rtW) / 2;
+            const offsetY = (fullH - rtH) / 2;
+            const vY      = fullH - offsetY - rtH;
 
-            // b) Tell the camera to only render that sub-frustum
-            camera.setViewOffset(fullW, fullH, offsetX, vY, cropW, cropH);
-
-            // c) Render into our small render-target (all on GPU)
+            camera.setViewOffset(fullW, fullH, offsetX, vY, rtW, rtH);
             renderer.setRenderTarget(renderTarget);
             renderer.clear();
             renderer.render(sceneEl.object3D, camera);
             renderer.setRenderTarget(null);
-
-            // d) Restore full view
             camera.clearViewOffset();
 
-            // e) Read pixels back into CPU memory (RGBA)
-            const w = renderTarget.width;
-            const h = renderTarget.height;
-            const buffer = new Uint8Array(4 * w * h);
-            renderer.readRenderTargetPixels(renderTarget, 0, 0, w, h, buffer);
-
-            // f) Bake into an off-screen <canvas>
-            const tmp     = document.createElement('canvas');
-            tmp.width     = w;
-            tmp.height    = h;
-            const ctx     = tmp.getContext('2d');
-            const imgData = ctx.createImageData(w, h);
-            imgData.data.set(buffer);
-            ctx.putImageData(imgData, 0, 0);
-
-            // g) Create or update the HTML <img> on top
-            let snap = document.getElementById('photoOverlay');
-            if (!snap) {
-              snap = document.createElement('img');
-              snap.id = 'photoOverlay';
-              document.body.appendChild(snap);
+            // Swap into the in-scene plane
+            if (photoMesh) {
+              photoMesh.material.map         = renderTarget.texture;
+              photoMesh.material.needsUpdate = true;
+              photoPlaneEl.setAttribute('visible', true);
+            } else {
+              console.warn('photoPlane mesh not yet available');
             }
-            snap.src = tmp.toDataURL('image/png');
+
+            // Reappear HUD
+            finderFrameEl.setAttribute('visible', true);
+
           };
 
           // Read the triggers for all devices
@@ -373,6 +363,7 @@
       <!-- Assets -->
       <a-assets>
         <img id = "ground"            src = "sprites/ground.png" />
+        <img id = "camFrame"          src = "sprites/cam/cam.png" />
         <img id = "circleNeutralPeep" src = "sprites/peeps/placeholder/circle_neutral_peep.png" />
         <img id = "squareNeutralPeep" src = "sprites/peeps/placeholder/square_neutral_peep.png" />
       </a-assets>
@@ -390,7 +381,28 @@
         camera-tracker
         photo-capture
         position  = "0 1.6 0"
-      ></a-entity>
+       >
+        <!-- the fixed “viewfinder” frame -->
+        <a-plane
+          id        = "finderFrame"
+          src       = "#camFrame"
+          width     = "0.4"
+          height    = "0.5"
+          position  = "0 0 -0.6"
+          material  = "transparent: true; alphaTest: 0.01"
+          animation = "property: position; dur: 2000; dir: alternate; loop: true; to: 0.01 0.01 -0.6; easing: easeInOutQuad"
+        ></a-plane>
+
+        <!-- the freeze-frame, initially hidden -->
+        <a-plane
+          id        = "photoPlane"
+          visible   = "false"
+          width     = "0.4"
+          height    = "0.5"
+          position  = "0 0 -0.6"
+          material  = "shader: flat; transparent: true; side: double"
+        ></a-plane>
+      </a-entity>
 
       <!-- Infinite ground plane -->
       <a-plane
@@ -410,12 +422,5 @@
         peep-manager
       ></a-entity>
     </a-scene>
-
-    <!-- Camera overlay HUD -->
-    <img
-      id        = "cameraOverlay"
-      src       = "sprites/cam/cam.png"
-      alt       = "Camera Overlay should be here"
-    />
   </body>
 </html>
