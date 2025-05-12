@@ -313,7 +313,7 @@ var textStrings_FA = {
 };
 // Brazilian Portuguese translation.
 // by Filipe Daineze https://github.com/fddaineze
-var textStrings_PT = {
+var textStrings_PT_BR_1 = {
 	// Act 1
 	"niceHat": 			"OOH CHAPÉU MANEIRO",
 	"outtaHere": 			"Isso, cai fora daqui",
@@ -415,7 +415,7 @@ var textStrings_PT = {
 	"misatrributed": 		"(atribuído erroneamente)",
 };
 
-var textStrings_PT_BR = { //I put that way because portuguese from Brazil (PT_BR) is a little different than portuguese from Portugal (PT_PT)
+var textStrings_PT_BR_2 = { //I put that way because portuguese from Brazil (PT_BR) is a little different than portuguese from Portugal (PT_PT)
 	// Act 1
 	"niceHat": "OH BELO CHAPÉU",
 	"outtaHere": "sim, saia daqui",
@@ -515,6 +515,106 @@ var textStrings_PT_BR = { //I put that way because portuguese from Brazil (PT_BR
 
 	// (quote0004.png)
 	"misatrributed": "(atribuído erroneamente)",
+};
+
+// Actual Portuguese, by me, AnJoMorto, because none of the previous ones where European Portuguese
+var textStrings_PT_PT = {
+	// Act 1
+	"niceHat":           "OOH CHAPÉU PORREIRO",
+	"outtaHere":         "é, vai-te embora",
+	"getARoom":          "QUE NOJO, ARRANJEM UM QUARTO",
+	"notCoolAnymore":    "esquece, chapéus já não são fixes",
+	"tvOnTv":            "UMA TV... NA TV!",
+	"cricky":            "GRILINHO <3",
+	"tooManyCrickets":   "ok, já são demasiados grilos",
+	"normalPeep":        "apenas uma pessoa normal",
+	"normalPeeps":       "apenas algumas pessoas normais",
+	"wowNothing":        "WOWWEE, NÃO É NADA",
+
+	// Act 2
+	"crazySquareAttacks": "QUADRADOS LOUCOS ATACAM",
+	"justMissed":         "oooooh escapou por pouco",
+	"somethingInteresting": "(tem de os apanhar a fazer *algo* interessante...)",
+	"whoIsScreaming":     "(tem de apanhar quem lhes está a gritar)",
+	"circleFearsSquares": "CÍRCULOS TEMEM QUADRADOS",
+	"whoScaresThem":      "(tem de apanhar *por quem* eles estão assustados)",
+	"areTheyScared":      "(tem de os apanhar *a ficarem* assustados por um quadrado)",
+	"squaresSnubCircles": "QUADRADOS ESNOBAM CÍRCULOS",
+	"areTheySnubbed":     "(tem de os apanhar *enquanto* esnobam um círculo)",
+	"everyoneHates":      "TODO MUNDO ODEIA TODO MUNDO!!1!",
+	"almostEveryoneHates":"QUASE TODO MUNDO ODEIA TODO MUNDO...",
+	"squaresHateCircles": "QUADRADOS ODEIAM CÍRCULOS",
+	"circlesHateSquares": "CÍRCULOS ODEIAM QUADRADOS",
+	"areTheyYelling":     "(tem de os apanhar *a gritar* com os outros)",
+	"nerdsNow":           "o que é que estes tótós estão a fazer agora",
+	"schockedPeep":       "por que é que esta pessoa está chocada?",
+	"whatever":           "tanto faz",
+
+	// Act 3
+	"ellipsis":           ". . .",
+	"coolNoMore":         "chapéus já não são fixes, não ouviste?",
+	"beScared":           "TENHAM MEDO. TENHAM RAIVA.",
+
+	// MANIFESTO
+	"manifesto": [
+		"quem sintoniza para ver *pessoas a darem-se bem?*",
+		"paz é aborrecida. violência torna-se viral.",
+		"e todas as histórias precisam de um conflito, por isso...",
+		"DÊ AO PÚBLICO O QUE ELES QUEREM."
+	],
+
+	// -- Strings currently in graphics resources --
+
+	// (bg_preload.png) Preload screen
+	"playingTime":       "tempo de jogo: 5 minutos",
+	"warning":           "aviso: o programa seguinte\ncontém cenas de esnobismo,\nrudeza e assassinato em massa.\naconselha-se discrição do espetador.",
+
+	// (cam-instructions.png) Camera Instructions
+	"pointAndClick":     "APONTE E CLIQUE",
+
+	// (chyron3.png)
+	"chyronNothing":     "WOWWEE, NÃO É *NADA*",
+
+	// (credits0001.png)
+	"createdBy":         "criado por",
+	"NickyCase":         "Nicky Case",
+
+	// (credits0002.png)
+	"manyThanks":        "muito obrigado aos meus testadores:",
+
+	// (credits000[3,4,5,6].png)
+	"patreonSupporters": "e aos meus apoiadores no Patreon:",
+
+	// (credits0007.png)
+	"lastButNotLeast":   "e por último, mas não menos importante,",
+
+	// (credits0008.png)
+	"thankYouForPlaying":"obrigado a TI por jogares!",
+
+	// (preload_play.png)
+	"playButton":        "JOGAR",
+
+	// (end_button.png) Post Credits
+	"otherWorkButton":   "veja os meus outros trabalhos",
+	"buyCoffeeButton":   "oferece-me um café",
+	"replayButton":      "repete esta confusão",
+
+	// (logo.png) Post Credits
+	"logoWBWWB":         "PARTILHA A DOR:",
+
+	// (end_prototype.png)
+	"endOfPrototype":    "FIM DO PROTÓTIPO",
+	"toBeContinued":     "(continua!)",
+
+	// (quote0002.png)
+	"WBWWB":             "Tornamo-nos naquilo que contemplamos.",
+	"WSOTATOTSU":        "Moldamos as nossas ferramentas e depois as nossas ferramentas moldam-nos.",
+
+	// (quote0003.png)
+	"MarshallMcLuhan":   "Marshall McLuhan",
+
+	// (quote0004.png)
+	"misatrributed":     "(atribuído incorretamente)",
 };
 
 var textStrings_ES = {

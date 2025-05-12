@@ -62,9 +62,12 @@
           // Grab the *entity* camera (always the monoscopic one), not the scene’s XR ArrayCamera.
           const cameraEl = this.el.getObject3D('camera');
 
-          const finderFrameEl = sceneEl.querySelector('#finderFrame');
-          const photoPlaneEl  = sceneEl.querySelector('#photoPlane');
-          const phoneEl       = sceneEl.querySelector('#phonePlane');
+          const finderFrameEl     = sceneEl.querySelector('#finderFrame');
+          const photoPlaneEl      = sceneEl.querySelector('#photoPlane');
+          const phoneEl           = sceneEl.querySelector('#phonePlane');
+          const captionContainer  = sceneEl.querySelector('#captionContainer');
+          const captionBox        = sceneEl.querySelector('#captionBox');
+          const captionEl         = sceneEl.querySelector('#photoCaption');
 
           // Compute RT size so its aspect matches the plane's
           const pw = parseFloat(photoPlaneEl.getAttribute('width'));
@@ -87,6 +90,8 @@
             finderFrameEl.setAttribute('visible', false);
             photoPlaneEl.setAttribute('visible', false);
             phoneEl.setAttribute('visible', false);
+            captionContainer.setAttribute('visible', false);
+
              // 2) Compute world & screen metrics
             const fullW = renderer.domElement.width;
             const fullH = renderer.domElement.height;
@@ -164,6 +169,20 @@
             // 8) Show HUD again
             finderFrameEl.setAttribute('visible', true);
             phoneEl.setAttribute('visible', true);
+
+            // 9) Show caption/comment
+            // Optionally change box color: captionBox.setAttribute('color', '#cc2727');
+            let key;
+            if (captured.length === 0) {
+              key = 'wowNothing';
+            } else if (captured.length === 1) {
+              key = 'normalPeep';
+            } else {
+              key = 'normalPeeps';
+            }
+            const caption = textStrings_EN[key];
+            captionEl.setAttribute('text', `value: ${caption}`);
+            captionContainer.setAttribute('visible', true);
           };
 
           // Read the triggers for all devices
@@ -423,6 +442,36 @@
           material  = "shader: flat; transparent: true; alphaTest: 0.01; side: double"
         ></a-plane>
 
+        <!-- Caption container -->
+        <a-entity id="captionContainer" visible="false" position="0 -0.32 -0.6">
+          
+          <!-- Background box -->
+          <a-plane
+            id        = "captionBox"
+            width     = "0.4"
+            height    = "0.13"
+            color     = "#000000"
+            material  = "transparent: true; opacity: 1"
+          ></a-plane>
+
+          <!-- Wrapped, left-aligned text -->
+          <a-entity
+            id        = "photoCaption"
+            position  = "-0.17 0 0.001"
+            scale     = "1.4 1.4 1"
+            text      = "
+              value: ;
+              font: exo2bold;
+              align: left;
+              anchor: left;
+              width: 0.4;
+              color: #ffffff;
+              baseline: center;
+            ">
+          </a-entity>
+
+        </a-entity>
+
       </a-entity>
 
       <!-- Infinite ground plane -->
@@ -435,7 +484,7 @@
       </a-plane>
 
       <!-- Sky background -->
-      <a-sky color="#D3D3D3"></a-sky>
+      <a-sky color  = "#D3D3D3"></a-sky>
 
       <!-- Peep spawner -->
       <a-entity
