@@ -14,7 +14,7 @@ An experimental virtual-reality adaptation of Nicky Case’s satirical news-cycl
 
 ---
 
-## How to Run the prototype for now
+## How to Run the Prototype for Now
 
 1. Open **`index.html`** in any WebXR/WebVR-compatible browser (e.g. Oculus Browser, Chrome).  
 2. Click the **Enter VR** button (bottom right) and put on your headset — or use mouse/touch on desktop or mobile.  
@@ -27,6 +27,13 @@ An experimental virtual-reality adaptation of Nicky Case’s satirical news-cycl
 - A VR-capable device or modern desktop browser with WebXR support  
 
 ---
+
+## **AI GENERATED CONTENT DISCLOSURE**  
+
+The **developer is open about their AI usage**:  
+- AI assistance was used for **rewritings, text corrections, concept art for new elements, and code revision.**  
+- The **core game design, writing, and concept remain original or ported from Nicky Case.**  
+- All AI-generated content has been **reviewed, edited, and finalized by a human.**
 
 ## Credits & License
 
