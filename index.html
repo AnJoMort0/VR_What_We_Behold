@@ -121,6 +121,12 @@
               }
             });
 
+            // store results
+            this.capturedPeeps        = captured;
+            window.lastCapturedPeeps  = captured;
+            //console.log('Captured peeps:', captured);
+            console.log('Captured peep IDs:', captured.map(peep => peep.id));
+
             // 4) Temporarily disable XR so we render monoscopic into RT
             const wasXR = renderer.xr.enabled;
             renderer.xr.enabled = false;
