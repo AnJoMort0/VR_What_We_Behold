@@ -65,9 +65,27 @@
           const finderFrameEl     = sceneEl.querySelector('#finderFrame');
           const photoPlaneEl      = sceneEl.querySelector('#photoPlane');
           const phoneEl           = sceneEl.querySelector('#phonePlane');
+          
           const captionContainer  = sceneEl.querySelector('#captionContainer');
           const captionBox        = sceneEl.querySelector('#captionBox');
           const captionEl         = sceneEl.querySelector('#photoCaption');
+          const hashtagPlane      = sceneEl.querySelector('#hashtagPlane');
+
+          // Function to set the different attriibutes of the capture in one go
+          function updateCaption(text, isInteresting = false) {
+            // 1) set the text
+            captionEl.setAttribute('text', `value: ${text}`);
+            // 2) tint the box
+            captionBox.setAttribute('color',
+              isInteresting ? '#cc2727' : '#000000'
+            );
+            // 3) pick which hashtag image
+            hashtagPlane.setAttribute('src',
+            isInteresting ? '#hashtag' : '#hashtagBroken'
+            );
+            // 4) show the whole container
+            captionContainer.setAttribute('visible', true);
+          }
 
           // Compute RT size so its aspect matches the plane's
           const pw = parseFloat(photoPlaneEl.getAttribute('width'));
@@ -171,8 +189,9 @@
             phoneEl.setAttribute('visible', true);
 
             // 9) Show caption/comment
-            // Optionally change box color: captionBox.setAttribute('color', '#cc2727');
+            // Optionally change box color: captionBox.setAttribute('color', '#cc2727'); and hashtagPlane.setAttribute('src', '#hashtag');
             let key;
+            let ii;
             if (captured.length === 0) {
               key = 'wowNothing';
             } else if (captured.length === 1) {
@@ -181,8 +200,7 @@
               key = 'normalPeeps';
             }
             const caption = textStrings_EN[key];
-            captionEl.setAttribute('text', `value: ${caption}`);
-            captionContainer.setAttribute('visible', true);
+            updateCaption(caption, ii)
           };
 
           // Read the triggers for all devices
@@ -190,7 +208,7 @@
           window.addEventListener('click',        this.handleCapture);
           // Vive/Wand/Quest remotes
           sceneEl.addEventListener('triggerdown', this.handleCapture);
-          // WebXR “select” for generic controllers (and Oculus Go clickpad)
+          // WebXR “select” for generic controllers (and Oculus Go clickpad) --> heavily chatGPT assisted, because I couldn't find any other solution
           sceneEl.addEventListener('selectstart', this.handleCapture);
            // Prepare to poll gamepad buttons 0–7 (A,B,X,Y,L1,R1,L2,R2) because nothing was working before for my Switch gamepad
             this.prevGP = {};  // track previous pressed state by button index
@@ -394,6 +412,8 @@
         <img id = "ground"            src = "sprites/ground.png" />
         <img id = "camFrame"          src = "sprites/cam/cam.png" />
         <img id = "phone"             src = "sprites/phone.png" />
+        <img id = "hashtag"           src = "sprites/hashtag.png" />
+        <img id = "hashtagBroken"     src = "sprites/hashtag_broken.png" />
         <img id = "circleNeutralPeep" src = "sprites/peeps/placeholder/circle_neutral_peep.png" />
         <img id = "squareNeutralPeep" src = "sprites/peeps/placeholder/square_neutral_peep.png" />
       </a-assets>
@@ -467,9 +487,18 @@
               width: 0.4;
               color: #ffffff;
               baseline: center;
-            ">
-          </a-entity>
+            "
+          ></a-entity>
 
+          <!-- Hashtag from the original chypron -->
+          <a-plane
+            id        = "hashtagPlane"
+            src       = "#hashtagBroken"
+            visible   = "true"
+            position  = "-0.18 0.06 0.001"
+            scale     = "0.07 0.07 0"
+            material  = "shader: flat; transparent: true; alphaTest: 0.01; side: double"
+          ></a-plane>
         </a-entity>
 
       </a-entity>
