@@ -10,6 +10,62 @@
       const PEEP_SPAWN_RADIUS   = 8;
       const PEEP_DEFAULT_SPEED  = 0.015;
 
+      /**
+       * SPRITESHEET-ANIMATION COMPONENT
+       * This is a costum component that helps incorporating spritesheet suppport into A-Frame
+       * heavily chatGPT assisted, based on this: https://stackoverflow.com/questions/51620935/aframe-spritesheet-component-freezing-webvr-environment-in-browser, since I had no idea how to do this. I was going to create a single image for every frame and change them manually in code
+       */
+      AFRAME.registerComponent('spritesheet-animation', {
+        schema: {
+          rows:            { type: 'number', default: 1 },
+          columns:         { type: 'number', default: 1 },
+          firstFrameIndex: { type: 'number', default: 0 },
+          lastFrameIndex:  { type: 'number', default: -1 },
+          frameDuration:   { type: 'number', default: 1 }, // seconds
+          loop:            { type: 'boolean', default: true }
+        },
+
+        init: function () {
+          const d = this.data;
+          this.repeatX = 1 / d.columns;
+          this.repeatY = 1 / d.rows;
+          if (d.lastFrameIndex < 0) {
+            d.lastFrameIndex = d.rows * d.columns - 1;
+          }
+          this.currentFrameIndex = d.firstFrameIndex;
+          this.frameTimer = 0;
+          this.mesh = this.el.getObject3D('mesh');
+        },
+
+        tick: function (time, dt) {
+          const d = this.data;
+          if (!this.mesh || (!d.loop && this.currentFrameIndex > d.lastFrameIndex)) return;
+
+          this.frameTimer += dt / 1000;
+          while (this.frameTimer > d.frameDuration) {
+            this.currentFrameIndex++;
+            this.frameTimer -= d.frameDuration;
+            if (this.currentFrameIndex > d.lastFrameIndex) {
+              if (d.loop) {
+                this.currentFrameIndex = d.firstFrameIndex;
+              } else {
+                return;
+              }
+            }
+          }
+
+          const col = this.currentFrameIndex % d.columns;
+          const row = Math.floor(this.currentFrameIndex / d.columns);
+          const offsetX = col / d.columns;
+          const offsetY = (d.rows - row - 1) / d.rows;
+
+          if (this.mesh.material.map) {
+            this.mesh.material.map.repeat.set(this.repeatX, this.repeatY);
+            this.mesh.material.map.offset.set(offsetX, offsetY);
+          }
+        }
+      });
+
       AFRAME.registerComponent('debug-toggle', { // chatGPT assisted
         init: function () {
           window.DEBUG = false;
@@ -339,12 +395,16 @@
        */
        AFRAME.registerComponent('peep-manager', {
         schema: {
-          count:        { type: 'int',    default: PEEP_SPAWN_COUNT },
-          radius:       { type: 'number', default: PEEP_SPAWN_RADIUS },
-          assetPrefix:  { type: 'string', default: '#' }
+          count:       { type: 'int',    default: PEEP_SPAWN_COUNT },
+          radius:      { type: 'number', default: PEEP_SPAWN_RADIUS },
+          assetPrefix: { type: 'string', default: '#' }
         },
+
         init: function () {
           const half = this.data.count / 2;
+          const bodyHeight = 1.6; // universal world unit tall
+          const bodyWidth  = (120 / 160) * bodyHeight; // the spritesheet is 120/140 but 160 makes them a little taller and more good looking in VR
+
           for (let i = 0; i < this.data.count; i++) {
             let type;
             if (i < half) {
@@ -352,49 +412,87 @@
             } else {
               type = 'square';
             }
+            const id = `${type}-${i}`;
+            const initialMood = "neutral";
 
-            let spriteId;
-            if (type === 'circle') {
-              spriteId = 'circleNeutralPeep';
-            } else {
-              spriteId = 'squareNeutralPeep';
-            }
-
-            const peepEl = document.createElement('a-image');
-
-            // Unique ID and type tag, this is used to know what peeps are in front of the camera
-            peepEl.setAttribute('id', `${type}-${i}`);
+            // Parent container for body + face
+            const peepEl = document.createElement('a-entity');
+            peepEl.setAttribute('id', id);
             peepEl.setAttribute('data-peep-type', type);
+            peepEl.setAttribute('mood', initialMood);
 
             // Random XZ within radius, Y = 1
-            const angle   = Math.random() * 2 * Math.PI;
-            const dist    = Math.random() * this.data.radius;
-            const x = dist * Math.cos(angle);
-            const z = dist * Math.sin(angle);
-            peepEl.setAttribute('position', `${x} 1 ${z}`);
-            peepEl.setAttribute('src', this.data.assetPrefix + spriteId);
+            const angle = Math.random() * 2 * Math.PI;
+            const dist  = Math.random() * this.data.radius;
+            const x     = dist * Math.cos(angle);
+            const z     = dist * Math.sin(angle);
+            peepEl.setAttribute('position', `${x} ${bodyHeight/2} ${z}`);
 
-             // Prevents png invisible parts collision
+            // BODY sprite
+            const body = document.createElement('a-image');
+            body.setAttribute('src', this.data.assetPrefix + 'bodySheet');
+            body.setAttribute('width',  bodyWidth);
+            body.setAttribute('height', bodyHeight);
+            body.setAttribute('spritesheet-animation', `
+              columns:       2;
+              rows:          1;
+              firstFrameIndex: ${ type === 'circle' ? 0 : 1 };
+              lastFrameIndex:  ${ type === 'circle' ? 0 : 1 };
+              frameDuration:   1;
+              loop:            false;
+            `);
+            // Prevents png invisible parts collision
+            body.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+            peepEl.appendChild(body);
+
+            // FACE sprite, neutral only
+            const face = document.createElement('a-image');
+            face.setAttribute('src', this.data.assetPrefix + 'faceSheet');
+            face.setAttribute('width',  bodyWidth);
+            face.setAttribute('height', bodyHeight);
+            // Shift left a bit for squares because it's not lining up for some reason
+            const faceXOffset = type === 'square'
+              ? - bodyWidth * 0.07
+              : 0;
+            face.setAttribute(
+              'position',
+              `${faceXOffset} ${bodyHeight * 0.25} 0.01`
+            );
+            face.setAttribute('spritesheet-animation', `
+              columns:         2;
+              rows:            7;
+              firstFrameIndex: 0;
+              lastFrameIndex:  0;
+              frameDuration:   0.5;
+              loop:            true;
+            `);
+            // Prevents png invisible parts collision
+            face.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+            peepEl.appendChild(face);
+
+            // Prevents png invisible parts collision
             peepEl.setAttribute('material', 'transparent: true; alphaTest: 0.01');
 
-            // Add behaviors
+            // Common behavior
             peepEl.setAttribute('billboard', '');
             peepEl.setAttribute(
               'peep-mover',
-              `speed: ${0.01 + Math.random() * 0.01}; radius: ${
-                this.data.radius
-              }`
+              `speed: ${0.01 + Math.random() * 0.01}; radius: ${this.data.radius}`
             );
             peepEl.setAttribute('no-frustum-cull', '');
 
             // --- DEBUG: Floating ID label over each peep - chatGPT generated ---
             const labelEl = document.createElement('a-entity');
             labelEl.classList.add('debug-label');
-            labelEl.setAttribute('text',
-              `value: ${peepEl.id}; align: center; width: 2; color: #000`);
-            labelEl.setAttribute('position', '0 0.5 0');   // slightly above the head
-            labelEl.setAttribute('billboard', '');         // always face camera
-            labelEl.setAttribute('visible', false);        // start hidden
+            labelEl.setAttribute('text', `
+              value: ${id};
+              align: center;
+              width: 2;
+              color: #000
+            `);
+            labelEl.setAttribute('position', '0 0.5 0');
+            labelEl.setAttribute('billboard', '');
+            labelEl.setAttribute('visible', false);
             peepEl.appendChild(labelEl);
             // ----------------------------------------------
 
@@ -402,6 +500,7 @@
           }
         }
       });
+
     </script>
   </head>
 
@@ -414,8 +513,8 @@
         <img id = "phone"             src = "sprites/phone.png" />
         <img id = "hashtag"           src = "sprites/hashtag.png" />
         <img id = "hashtagBroken"     src = "sprites/hashtag_broken.png" />
-        <img id = "circleNeutralPeep" src = "sprites/peeps/placeholder/circle_neutral_peep.png" />
-        <img id = "squareNeutralPeep" src = "sprites/peeps/placeholder/square_neutral_peep.png" />
+        <img id = "bodySheet"         src = "sprites/peeps/body.png">
+        <img id = "faceSheet"         src = "sprites/peeps/face.png">
       </a-assets>
 
       <!-- Player camera -->
