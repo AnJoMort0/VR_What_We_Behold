@@ -127,7 +127,7 @@
           const captionEl         = sceneEl.querySelector('#photoCaption');
           const hashtagPlane      = sceneEl.querySelector('#hashtagPlane');
 
-          // Function to set the different attriibutes of the capture in one go
+          // Function to set the different attributes of the capture in one go
           function updateCaption(text, isInteresting = false) {
             // 1) set the text
             captionEl.setAttribute('text', `value: ${text}`);
@@ -143,14 +143,14 @@
             captionContainer.setAttribute('visible', true);
           }
 
-          // Compute RT size so its aspect matches the plane's
+          // Prepare render‐target matching the plane's aspect
           const pw = parseFloat(photoPlaneEl.getAttribute('width'));
           const ph = parseFloat(photoPlaneEl.getAttribute('height'));
           const rtW = Math.floor(window.innerWidth  * 0.3);
           const rtH = Math.floor(rtW * (ph / pw));
           const renderTarget = new THREE.WebGLRenderTarget(rtW, rtH);
 
-          // Grab the Three.js mesh for the plane
+          // Grab the Three.js mesh once it’s loaded
           let photoMesh = photoPlaneEl.getObject3D('mesh');
           photoPlaneEl.addEventListener('object3dset', evt => {
             if (evt.detail.type === 'mesh') {
@@ -158,21 +158,43 @@
             }
           });
 
-          // On click: crop, render, read back & stamp into an HTML <img>
-          this.handleCapture = () => {
-            // 1) Hide HUD so it doesn't appear in the shot
-            finderFrameEl.setAttribute('visible', false);
-            photoPlaneEl.setAttribute('visible', false);
-            phoneEl.setAttribute('visible', false);
+          // State flags
+          this.hasCaptured   = false;
+          this.dismissActive = false;
+
+          // Clears the freeze-frame UI and stops listening for dismiss
+          this.clearCapture = () => {
+            finderFrameEl.setAttribute('visible', true);
+            photoPlaneEl .setAttribute('visible', false);
+            phoneEl      .setAttribute('visible', false);
             captionContainer.setAttribute('visible', false);
 
-             // 2) Compute world & screen metrics
+            // remove our dismiss listeners
+            window.removeEventListener('click',        this.handleDismiss);
+            sceneEl .removeEventListener('triggerdown', this.handleDismiss);
+            sceneEl .removeEventListener('selectstart', this.handleDismiss);
+
+            this.hasCaptured   = false;
+            this.dismissActive = false;
+          };
+
+          // Called on first click to do the actual capture
+          this.handleCapture = () => {
+            if (this.hasCaptured) return;
+            this.hasCaptured = true;
+
+            // hide HUD so it doesn't show in the shot
+            finderFrameEl   .setAttribute('visible', false);
+            photoPlaneEl    .setAttribute('visible', false);
+            phoneEl         .setAttribute('visible', false);
+            captionContainer.setAttribute('visible', false);
+
+            // 1) Which peeps are in frame?
             const fullW = renderer.domElement.width;
             const fullH = renderer.domElement.height;
             const left  = (fullW - rtW) / 2;
             const top   = (fullH - rtH) / 2;
 
-            // 3) “Which peeps” logic (using fullW/fullH for consistency)
             const camPos = new THREE.Vector3();
             cameraEl.getWorldPosition(camPos);
             const camDir = new THREE.Vector3();
@@ -190,7 +212,6 @@
               const ndc = worldPos.clone().project(cameraEl);
               const x   = (ndc.x + 1) / 2 * fullW;
               const y   = (1 - ndc.y) / 2 * fullH;
-
               if (x >= left && x <= left + rtW && y >= top && y <= top + rtH) {
                 captured.push({
                   id:       peepEl.id,
@@ -206,16 +227,16 @@
             //console.log('Captured peeps:', captured);
             console.log('Captured peep IDs:', captured.map(peep => peep.id));
 
-            // 4) Temporarily disable XR so we render monoscopic into RT
+            // 2) Temporarily disable XR for a monoscopic render
             const wasXR = renderer.xr.enabled;
             renderer.xr.enabled = false;
 
-              // 4.1) Force camera aspect to match the RT (because of POV being wrong when VR mode is on)
-              const prevAspect = cameraEl.aspect;
-              cameraEl.aspect = fullW / fullH;
-              cameraEl.updateProjectionMatrix();
+            // Force camera aspect to match RT (because of POV being wrong when VR mode is on)
+            const prevAspect = cameraEl.aspect;
+            cameraEl.aspect = fullW / fullH;
+            cameraEl.updateProjectionMatrix();
 
-            // 5) Do the sub-frustum render
+            // 3) Render sub-frustum
             cameraEl.setViewOffset(fullW, fullH, left, fullH - top - rtH, rtW, rtH);
             renderer.setRenderTarget(renderTarget);
             renderer.clear();
@@ -223,14 +244,12 @@
             renderer.setRenderTarget(null);
             cameraEl.clearViewOffset();
 
-              // 5.1) Restore the original camera aspect
-              cameraEl.aspect = prevAspect;
-              cameraEl.updateProjectionMatrix();
-
-            // 6) Restore XR mode
+            // Restore original camera aspect & XR
+            cameraEl.aaspect = prevAspect;
+            cameraEl.updateProjectionMatrix();
             renderer.xr.enabled = wasXR;
 
-            // 7) Blit it onto the photo-plane
+            // 4) Blit to in-scene plane
             if (photoMesh) {
               photoMesh.material.map         = renderTarget.texture;
               photoMesh.material.needsUpdate = true;
@@ -240,14 +259,13 @@
               console.warn('photoPlane mesh not ready');
             }
 
-            // 8) Show HUD again
+            // 5) Show HUD again (phone stays up)
             finderFrameEl.setAttribute('visible', true);
-            phoneEl.setAttribute('visible', true);
+            phoneEl      .setAttribute('visible', true);
 
             // 9) Show caption/comment
             // Optionally change box color: captionBox.setAttribute('color', '#cc2727'); and hashtagPlane.setAttribute('src', '#hashtag');
             let key;
-            let ii;
             if (captured.length === 0) {
               key = 'wowNothing';
             } else if (captured.length === 1) {
@@ -256,7 +274,24 @@
               key = 'normalPeeps';
             }
             const caption = textStrings_EN[key];
-            updateCaption(caption, ii)
+            updateCaption(caption)
+            
+            // 7) Schedule un‐skippable interval & auto-dismiss
+            //    – after 5s, allow dismiss
+            setTimeout(() => { this.dismissActive = true; },  5000);
+            //    – after 15s, auto-dismiss
+            setTimeout(() => { this.clearCapture();       }, 15000);
+
+            // 8) Switch from "capture" to "dismiss" listeners
+            window  .addEventListener('click',       this.handleDismiss);
+            sceneEl .addEventListener('triggerdown', this.handleDismiss);
+            sceneEl .addEventListener('selectstart', this.handleDismiss);
+          };
+
+          // Called on (post-5s) click to dismiss
+          this.handleDismiss = () => {
+            if (!this.dismissActive) return;
+            this.clearCapture();
           };
 
           // Read the triggers for all devices
@@ -268,25 +303,28 @@
           sceneEl.addEventListener('selectstart', this.handleCapture);
            // Prepare to poll gamepad buttons 0–7 (A,B,X,Y,L1,R1,L2,R2) because nothing was working before for my Switch gamepad
             this.prevGP = {};  // track previous pressed state by button index
-          },
-          tick: function () {
+        },
+        tick: function () {
             // Poll connected gamepads
-            const gps = navigator.getGamepads && navigator.getGamepads();
-            if (!gps) return;
-            for (const gp of gps) {
-              if (!gp || !gp.buttons) continue;
-              // Only watch standard face & shoulder buttons
-              [0,1,2,3,4,5,6,7].forEach(idx => {
-                const btn = gp.buttons[idx];
-                if (!btn) return;
+          const gps = navigator.getGamepads && navigator.getGamepads();
+          if (!gps) return;
+          for (const gp of gps) {
+            if (!gp || !gp.buttons) continue;
+            [0,1,2,3,4,5,6,7].forEach(idx => {
+              const btn = gp.buttons[idx];
+              if (!btn) return;
                 // on newly pressed
-                if (btn.pressed && !this.prevGP[idx]) {
+              if (btn.pressed && !this.prevGP[idx]) {
+                if (!this.hasCaptured) {
                   this.handleCapture();
+                } else if (this.dismissActive) {
+                  this.handleDismiss();
                 }
-                // save for next frame
-                this.prevGP[idx] = btn.pressed;
-              });
-            }
+              }
+              // save for next frame
+              this.prevGP[idx] = btn.pressed;
+            });
+          }
         }
       });
 
@@ -505,7 +543,7 @@
   </head>
 
   <body>
-    <a-scene debug-toggle fog="type: linear; color: #D3D3D3; near: 20; far: 100">
+    <a-scene debug-toggle fog= "type: linear; color: #D3D3D3; near: 20; far: 100">
       <!-- Assets -->
       <a-assets>
         <img id = "ground"            src = "sprites/ground.png" />
@@ -562,7 +600,7 @@
         ></a-plane>
 
         <!-- Caption container -->
-        <a-entity id="captionContainer" visible="false" position="0 -0.32 -0.6">
+        <a-entity id = "captionContainer" visible = "false" position = "0 -0.32 -0.6">
           
           <!-- Background box -->
           <a-plane
