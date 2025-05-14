@@ -169,18 +169,25 @@
 
           // Clears the freeze-frame UI and stops listening for dismiss
           this.clearCapture = () => {
-            captureHUDel  .setAttribute('visible', false);
-            finderFrameEl .setAttribute('visible', true);
+            captureHUDel.setAttribute('animation__out', `
+              property: position;
+              to: 0 -1 -0.61;
+              dur: 300;
+              easing: easeInQuad
+            `);
             
-            // remove our dismiss listeners
-            window .removeEventListener('click'      , this.handleDismiss);
-            sceneEl.removeEventListener('triggerdown', this.handleDismiss);
-            sceneEl.removeEventListener('selectstart', this.handleDismiss);
-
-            this.hasCaptured   = false;
-            this.dismissActive = false;
+            setTimeout(() => {
+              captureHUDel  .setAttribute('visible', false);
+              finderFrameEl .setAttribute('visible', true);
+              // and tear down your dismiss listeners as before…
+              window .removeEventListener('click'      , this.handleDismiss);
+              sceneEl.removeEventListener('triggerdown', this.handleDismiss);
+              sceneEl.removeEventListener('selectstart', this.handleDismiss);
+              this.hasCaptured   = false;
+              this.dismissActive = false;
+            }, 300);
           };
-            
+
           // Called on first click to do the actual capture
           this.handleCapture = () => {
             if (this.hasCaptured) return;
@@ -277,6 +284,13 @@
 
             // Show HUD again (phone stays up)
             captureHUDel.setAttribute('visible', true);
+            captureHUDel.setAttribute('animation__in', `
+              property: position;
+              from: 0 -1  -0.6;   /* off-screen */
+              to:   0 0 -0.6;     /* final */
+              dur: 300;
+              easing: easeOutQuad
+            `);
             
             // Schedule un‐skippable interval & auto-dismiss
             //    – after 5s, allow dismiss
@@ -596,6 +610,15 @@
           </a-entity>
         </a-plane>
 
+        <a-plane 
+          id        = "flashPlane"
+          visible   = "false"
+          width     = "2" 
+          height    = "2"
+          position  = "0 0 -0.5"
+          material  = "color: white; transparent: true; opacity: 0">
+        </a-plane>
+
         <a-entity 
           id        = "captureHUD"
           position  = "0 0 -0.6"
@@ -606,7 +629,7 @@
             id        = "photoPlane"
             width     = "0.4"
             height    = "0.5"
-            position  = "0 0 0"
+            position  = "0 0 "
             material  = "shader: flat; transparent: true; side: double"
           ></a-plane>
 
