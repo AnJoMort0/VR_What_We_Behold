@@ -10,6 +10,12 @@
       const PEEP_SPAWN_RADIUS   = 8;
       const PEEP_DEFAULT_SPEED  = 0.015;
 
+      const bodyHeight = 1.6; // universal world unit tall
+      const bodyWidth  = (120 / 160) * bodyHeight; // the spritesheet is 120/140 but 160 makes them a little taller and more good looking in VR
+
+
+      let Act = 1;
+
       /**
        * SPRITESHEET-ANIMATION COMPONENT
        * This is a costum component that helps incorporating spritesheet suppport into A-Frame
@@ -107,6 +113,60 @@
       });
 
       /**
+       * GAME-MANAGER COMPONENT
+       * Controls what happens in each Act of the game
+       * Lightly chatGPT assisted, mostly helping me porting the Act_I.js original file
+       */
+      AFRAME.registerComponent('game-manager', {
+        init: function () {
+          if (Act == 1) {
+            // after 5s, spawn the Hat Guy
+            setTimeout(() => {
+              const sceneEl   = this.el.sceneEl;
+              const camObj    = sceneEl.camera;
+              const worldPos  = new THREE.Vector3();
+              camObj.getWorldPosition(worldPos);
+              const camDir    = new THREE.Vector3();
+              camObj.getWorldDirection(camDir);
+
+              // place him 3 units behind the camera
+              const spawnPos = worldPos.clone().add(camDir.multiplyScalar(-3));
+
+              // create the a-image for Hat Peep
+              const hatGuy = document.createElement('a-image');
+              hatGuy.setAttribute('id', 'hat_guy-0');
+              hatGuy.setAttribute('data-peep-type', 'hat_guy');
+              hatGuy.setAttribute('src', '#hatguySheet');
+              hatGuy.setAttribute('width',  bodyWidth);
+              hatGuy.setAttribute('height', bodyHeight);
+              hatGuy.setAttribute('spritesheet-animation', `
+                columns:1;
+                rows:1;
+                firstFrameIndex:0;
+                lastFrameIndex:0;
+                frameDuration:1;
+                loop:false;
+              `);
+              hatGuy.setAttribute('position', `${spawnPos.x} ${bodyHeight/2} ${spawnPos.z}`);
+
+              // standard behaviors
+              hatGuy.setAttribute('billboard', '');
+              hatGuy.setAttribute('peep-mover', `speed:0.01; radius:8`);
+              hatGuy.setAttribute('no-frustum-cull', '');
+              hatGuy.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+
+              sceneEl.appendChild(hatGuy);
+
+              console.log("hat spawned");
+            }, 5000);
+
+          } else {
+            return;
+          }
+        }
+      });
+
+      /**
        * PHOTO-CAPTURE COMPONENT
        * Grabs a snippet of the canva in GPU and shows it on click
        * heavily chatGPT assisted, but after lots of guidance and research on StackOverflow to finally come to this https://stackoverflow.com/questions/19183180/how-to-save-an-image-to-localstorage-and-display-it-on-the-next-page
@@ -133,9 +193,9 @@
           pointAndClickEl.setAttribute('text', `value: ${textStrings_EN["pointAndClick"]}`);
 
           // Function to set the different attributes of the capture in one go
-          function updateCaption(text, isInteresting = false) {
+          function updateCaption(key, isInteresting = false) {
             // 1) set the text
-            captionEl.setAttribute('text', `value: ${text}`);
+            captionEl.setAttribute('text', `value: ${textStrings_EN[key]}`);
             // 2) tint the box
             captionBox.setAttribute('color',
               isInteresting ? '#cc2727' : '#000000'
@@ -264,16 +324,15 @@
             }
 
             // Show caption/comment
-            let key;
             if (captured.length === 0) {
-              key = 'wowNothing';
+              updateCaption('wowNothing');
+            } else if (Act == 1 && captured.some(p => p.type === 'hat_guy')){
+              updateCaption('niceHat', true);
             } else if (captured.length === 1) {
-              key = 'normalPeep';
+              updateCaption('normalPeep');
             } else {
-              key = 'normalPeeps';
+              updateCaption('normalPeeps');
             }
-            const caption = textStrings_EN[key];
-            updateCaption(caption)
 
             // Show HUD again (phone stays up)
             captureHUDel.setAttribute('visible', true);
@@ -437,13 +496,10 @@
         schema: {
           count:       { type: 'int',    default: PEEP_SPAWN_COUNT },
           radius:      { type: 'number', default: PEEP_SPAWN_RADIUS },
-          assetPrefix: { type: 'string', default: '#' }
         },
 
         init: function () {
           const half = this.data.count / 2;
-          const bodyHeight = 1.6; // universal world unit tall
-          const bodyWidth  = (120 / 160) * bodyHeight; // the spritesheet is 120/140 but 160 makes them a little taller and more good looking in VR
 
           for (let i = 0; i < this.data.count; i++) {
             let type;
@@ -470,7 +526,7 @@
 
             // BODY sprite
             const body = document.createElement('a-image');
-            body.setAttribute('src', this.data.assetPrefix + 'bodySheet');
+            body.setAttribute('src', '#bodySheet');
             body.setAttribute('width',  bodyWidth);
             body.setAttribute('height', bodyHeight);
             body.setAttribute('spritesheet-animation', `
@@ -487,7 +543,7 @@
 
             // FACE sprite, neutral only
             const face = document.createElement('a-image');
-            face.setAttribute('src', this.data.assetPrefix + 'faceSheet');
+            face.setAttribute('src',   '#faceSheet');
             face.setAttribute('width',  bodyWidth);
             face.setAttribute('height', bodyHeight);
             // Shift left a bit for squares because it's not lining up for some reason
@@ -530,7 +586,7 @@
               width: 2;
               color: #000
             `);
-            labelEl.setAttribute('position', '0 0.5 0');
+            labelEl.setAttribute('position', '0 0.6 0');
             labelEl.setAttribute('billboard', '');
             labelEl.setAttribute('visible', false);
             peepEl.appendChild(labelEl);
@@ -545,7 +601,12 @@
   </head>
 
   <body>
-    <a-scene debug-toggle fog= "type: linear; color: #D3D3D3; near: 20; far: 100">
+    <a-scene 
+      debug-toggle 
+      game-manager 
+      fog= "type: linear; color: #D3D3D3; near: 20; far: 100"
+      >
+
       <!-- Assets -->
       <a-assets>
         <img id = "ground"            src = "sprites/ground.png" />
@@ -553,8 +614,10 @@
         <img id = "phone"             src = "sprites/phone.png" />
         <img id = "hashtag"           src = "sprites/hashtag.png" />
         <img id = "hashtagBroken"     src = "sprites/hashtag_broken.png" />
-        <img id = "bodySheet"         src = "sprites/peeps/body.png">
-        <img id = "faceSheet"         src = "sprites/peeps/face.png">
+
+        <img id = "bodySheet"         src = "sprites/peeps/body.png" />
+        <img id = "faceSheet"         src = "sprites/peeps/face.png" />
+        <img id = "hatguySheet"       src = "sprites/peeps/hatguy.png" />
       </a-assets>
 
       <!-- Player camera -->
