@@ -13,7 +13,6 @@
       const bodyHeight = 1.6; // universal world unit tall
       const bodyWidth  = (120 / 160) * bodyHeight; // the spritesheet is 120/140 but 160 makes them a little taller and more good looking in VR
 
-
       let Act = 1;
 
       /**
@@ -151,7 +150,7 @@
 
               // standard behaviors
               hatGuy.setAttribute('billboard', '');
-              hatGuy.setAttribute('peep-mover', `speed:0.01; radius:8`);
+              hatGuy.setAttribute('peep-mover', `speed : 0.01; radius : 8`);
               hatGuy.setAttribute('no-frustum-cull', '');
               hatGuy.setAttribute('material', 'transparent: true; alphaTest: 0.01');
 
@@ -192,6 +191,9 @@
 
           pointAndClickEl.setAttribute('text', `value: ${textStrings_EN["pointAndClick"]}`);
 
+          this.enableDismissTimer = null;
+          this.autoDismissTimer   = null;
+
           // Function to set the different attributes of the capture in one go
           function updateCaption(key, isInteresting = false) {
             // 1) set the text
@@ -229,16 +231,30 @@
 
           // Clears the freeze-frame UI and stops listening for dismiss
           this.clearCapture = () => {
-            captureHUDel  .setAttribute('visible', false);
-            finderFrameEl .setAttribute('visible', true);
-            
-            // remove our dismiss listeners
-            window .removeEventListener('click'      , this.handleDismiss);
-            sceneEl.removeEventListener('triggerdown', this.handleDismiss);
-            sceneEl.removeEventListener('selectstart', this.handleDismiss);
+            // 1) stop any pending timers so they can't double-fire
+            clearTimeout(this.enableDismissTimer);
+            clearTimeout(this.autoDismissTimer);
 
+            // 2) emit the end-animation event
+            this.el.sceneEl.emit('end-capture-animation');
+
+            // 3) restore your HUD
+            captureHUDel .setAttribute('visible', false);
+            finderFrameEl.setAttribute('visible', true);
+
+            // 4) cleanup the dismiss listeners
+            window   .removeEventListener('click'      , this.handleDismiss);
+            sceneEl  .removeEventListener('triggerdown', this.handleDismiss);
+            sceneEl  .removeEventListener('selectstart', this.handleDismiss);
+
+            // 5) reset flags
             this.hasCaptured   = false;
             this.dismissActive = false;
+
+            // 6) Re-attach your capture listeners so the next click works**
+            window   .addEventListener('click'      , this.handleCapture);
+            sceneEl  .addEventListener('triggerdown', this.handleCapture);
+            sceneEl  .addEventListener('selectstart', this.handleCapture);
           };
             
           // Called on first click to do the actual capture
@@ -284,12 +300,30 @@
                 });
               }
             });
-
             // store results
             this.capturedPeeps        = captured;
             window.lastCapturedPeeps  = captured;
             //console.log('Captured peeps:', captured);
             console.log('Captured peep IDs:', captured.map(peep => peep.id));
+
+            // Detect any phones in the shot
+            const capturedPhones = [];
+            sceneEl.querySelectorAll('.capture-phone').forEach(phoneEl => {
+              const worldPos = new THREE.Vector3();
+              phoneEl.object3D.getWorldPosition(worldPos);
+
+              // Cull phones behind the camera
+              if (camDir.dot(worldPos.clone().sub(camPos)) <= 0) return;
+
+              // Project into the same buffer coords
+              const ndc = worldPos.clone().project(cameraEl);
+              const x   = (ndc.x + 1) / 2 * fullW;
+              const y   = (1 - ndc.y) / 2 * fullH;
+
+              if (x >= left && x <= left + rtW && y >= top && y <= top + rtH) {
+                capturedPhones.push(phoneEl);
+              }
+            });
 
             // Temporarily disable XR for a monoscopic render
             const wasXR = renderer.xr.enabled;
@@ -324,29 +358,37 @@
             }
 
             // Show caption/comment
-            if (captured.length === 0) {
+            if (captured.length === 0 && capturedPhones.length === 0) {
               updateCaption('wowNothing');
-            } else if (Act == 1 && captured.some(p => p.type === 'hat_guy')){
+            } else if (Act == 1 && captured.some(p => p.type === 'hat_guy')) {
               updateCaption('niceHat', true);
+            } else if (capturedPhones.length > 0) {
+              updateCaption('phoneOnPhone');
             } else if (captured.length === 1) {
               updateCaption('normalPeep');
             } else {
               updateCaption('normalPeeps');
             }
-
-            // Show HUD again (phone stays up)
+            this.el.sceneEl.emit('start-capture-animation');
+            // Show HUD again
             captureHUDel.setAttribute('visible', true);
             
             // Schedule un‐skippable interval & auto-dismiss
-            //    – after 5s, allow dismiss
-            setTimeout(() => { this.dismissActive = true; },  5000);
-            //    – after 15s, auto-dismiss
-            setTimeout(() => { this.clearCapture();       }, 15000);
+            this.enableDismissTimer = setTimeout(() => {
+              this.dismissActive = true;
+            }, 5000);
+            this.autoDismissTimer = setTimeout(() => {
+              this.clearCapture();
+            }, 15000);
 
             // Switch from "capture" to "dismiss" listeners
-            window  .addEventListener('click',       this.handleDismiss);
-            sceneEl .addEventListener('triggerdown', this.handleDismiss);
-            sceneEl .addEventListener('selectstart', this.handleDismiss);
+            window   .removeEventListener('click'      , this.handleCapture);
+            sceneEl  .removeEventListener('triggerdown', this.handleCapture);
+            sceneEl  .removeEventListener('selectstart', this.handleCapture);
+
+            window   .addEventListener('click'      , this.handleDismiss);
+            sceneEl  .addEventListener('triggerdown', this.handleDismiss);
+            sceneEl  .addEventListener('selectstart', this.handleDismiss);
           };
 
           // Called on (post-5s) click to dismiss
@@ -469,6 +511,144 @@
           const angle = Math.atan2(dx, dz);
           const deg   = THREE.MathUtils.radToDeg(angle);
           this.el.setAttribute('rotation', { x: 0, y: deg, z: 0 });
+        }
+      });
+
+      /**
+       * CAPTURE-ANIMATION Component
+       * Stops the peeps from moving and make them look at their phone
+       */
+       AFRAME.registerComponent('capture-animation', {
+        schema: {
+          lookOffset:   { type: 'vec2',   default: { x: 0.05, y: -0.05 } },
+          phoneSize:    { type: 'number', default: 0.2 },
+          lookDuration: { type: 'number', default: 700 } // ms
+        },
+
+        init: function () {
+          this.originalSpeeds  = new Map();
+          this.originalFacePos = new Map();
+          this.originalTicks   = new Map();
+          this.animating       = false;
+
+          this.el.addEventListener('start-capture-animation', () => {
+            if (!this.animating) this.runStart();
+          });
+          this.el.addEventListener('end-capture-animation', () => {
+            if (this.animating)  this.runEnd();
+          });
+        },
+
+        runStart: function () {
+          this.animating = true;
+          const { lookOffset, phoneSize, lookDuration } = this.data;
+          const peeps = Array.from(this.el.querySelectorAll('[data-peep-type]'));
+
+          peeps.forEach(peepEl => {
+            // 1) Halt their movement
+            const mover = peepEl.components['peep-mover'];
+            if (mover) {
+              // remember its speed
+              this.originalSpeeds.set(peepEl, mover.data.speed);
+              // remember its tick function
+              this.originalTicks.set(peepEl, mover.tick.bind(mover));
+              // disable both movement & flip
+              mover.tick = () => {};
+              mover.data.speed = 0;
+            }
+            // snap to whatever flip they had at the moment
+            const origScale = peepEl.getAttribute('scale');
+            peepEl.setAttribute('scale', origScale);
+
+            // 2) Spawn & animate the phone popping out
+            const phone = document.createElement('a-image');
+            phone.setAttribute('src',    '#phone');
+            phone.setAttribute('width',  phoneSize);
+            phone.setAttribute('height', phoneSize);
+            // start behind them
+            phone.setAttribute('position', '0 0.15 -0.001');
+            phone.classList.add('capture-phone');
+            // animate up into view
+            phone.setAttribute('animation__phonein', `
+              property: position;
+              to:       0.18 0.1 0.001;
+              dur:      ${lookDuration};
+              easing:   easeOutQuad;
+              loop:     false
+            `);
+            peepEl.appendChild(phone);
+
+            // 3) Make the face look down
+            const face = peepEl.querySelector('[spritesheet-animation][src="#faceSheet"]');
+            if (face) {
+              const orig = face.getAttribute('position');
+              this.originalFacePos.set(face, { ...orig });
+              face.setAttribute('animation__lookdown', `
+                property: position;
+                to:       ${orig.x + lookOffset.x} ${orig.y + lookOffset.y} ${orig.z};
+                dur:      ${lookDuration};
+                easing:   easeOutQuad;
+                loop:     false
+              `);
+            }
+          });
+        },
+
+        runEnd: function () {
+          const { lookDuration } = this.data;
+          const peeps = Array.from(this.el.querySelectorAll('[data-peep-type]'));
+
+          peeps.forEach(peepEl => {
+            // 1) Eyes look back up
+            const face = peepEl.querySelector('[animation__lookdown]');
+            if (face && this.originalFacePos.has(face)) {
+              const orig = this.originalFacePos.get(face);
+              face.removeAttribute('animation__lookdown');
+              face.setAttribute('animation__lookup', `
+                property: position;
+                to:       ${orig.x} ${orig.y} ${orig.z};
+                dur:      ${lookDuration};
+                easing:   easeOutQuad;
+                loop:     false
+              `);
+            }
+
+            // 2) Phone slides back
+            const phone = peepEl.querySelector('.capture-phone');
+            if (phone) {
+              phone.removeAttribute('animation__phonein');
+              phone.setAttribute('animation__phoneout', `
+                property: position;
+                to:       0 0.15 -0.001;
+                dur:      ${lookDuration};
+                easing:   easeInQuad;
+                loop:     false
+              `);
+            }
+
+            // 3) After the animation finishes, restore & clean up
+            setTimeout(() => {
+              // restore mover speed
+              const mover = peepEl.components['peep-mover'];
+              if (mover && this.originalTicks.has(peepEl)) {
+                mover.tick = this.originalTicks.get(peepEl);
+                const speed = this.originalSpeeds.get(peepEl);
+                peepEl.setAttribute('peep-mover', `speed: ${speed}`);
+                this.originalTicks.delete(peepEl);
+                this.originalSpeeds.delete(peepEl);
+              }
+              // remove the phone entity
+              if (phone && phone.parentNode) {
+                peepEl.removeChild(phone);
+              }
+              // clean up face animation
+              if (face) {
+                face.removeAttribute('animation__lookup');
+                this.originalFacePos.delete(face);
+              }
+              this.animating = false;
+            }, lookDuration);
+          });
         }
       });
 
@@ -603,7 +783,8 @@
   <body>
     <a-scene 
       debug-toggle 
-      game-manager 
+      game-manager
+      capture-animation
       fog= "type: linear; color: #D3D3D3; near: 20; far: 100"
       >
 

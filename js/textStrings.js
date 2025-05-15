@@ -9,6 +9,7 @@ var textStrings_EN = {
 	"getARoom": "GROSS, GO GET A ROOM",
 	"notCoolAnymore": "nvm hats aren't cool anymore",
 	"tvOnTv": "A TV... ON TV!",
+	"phoneOnPhone": "A PHONE... ON A PHONE!", // need to translate this to other languages
 	"cricky": "LIL' CRICKY <3",
 	"tooManyCrickets": "okay that's too many crickets",
 	"normalPeep": "just a normal peep",
