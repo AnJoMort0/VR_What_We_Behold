@@ -9,6 +9,9 @@
       const PEEP_SPAWN_COUNT    = 12;
       const PEEP_SPAWN_RADIUS   = 8;
       const PEEP_DEFAULT_SPEED  = 0.015;
+      const DISMISS_TIME        = 5000; //ms
+      let   dismissTime         = DISMISS_TIME;
+      const AUTO_DISMISS_TIME   = 15000;//ms
 
       const bodyHeight = 1.6; // universal world unit tall
       const bodyWidth  = (120 / 180) * bodyHeight; // the spritesheet is 120/140 but 180 makes them a little taller and more good looking in VR
@@ -75,6 +78,17 @@
         init: function () {
           window.DEBUG = false;
 
+          function allDEBUGS() {
+            window.DEBUG = !window.DEBUG;
+              updateLabels(window.DEBUG);
+              if (window.DEBUG) {
+                dismissTime = 10
+              } else {
+                dismissTime = DISMISS_TIME;
+              }
+              console.log('Debug mode:', window.DEBUG ? 'ON' : 'OFF');
+          }
+
           // peep id labels
           const updateLabels = show => {
             document.querySelectorAll('.debug-label')
@@ -84,9 +98,7 @@
           // Toggle on “D” key
           window.addEventListener('keydown', e => {
             if (e.key.toLowerCase() === 'd') {
-              window.DEBUG = !window.DEBUG;
-              updateLabels(window.DEBUG);
-              console.log('Debug mode:', window.DEBUG ? 'ON' : 'OFF');
+              allDEBUGS();
             }
           });
 
@@ -99,9 +111,7 @@
               if (!gp || !gp.buttons[12]) continue;
               const btn = gp.buttons[12];
               if (btn.pressed && !this.upPressed) {
-                window.DEBUG = !window.DEBUG;
-                updateLabels(window.DEBUG);
-                console.log('Debug mode:', window.DEBUG ? 'ON' : 'OFF');
+                allDEBUGS();
                 this.upPressed = true;
               } else if (!btn.pressed) {
                 this.upPressed = false;
@@ -168,7 +178,8 @@
       /**
        * PHOTO-CAPTURE COMPONENT
        * Grabs a snippet of the canva in GPU and shows it on click
-       * heavily chatGPT assisted, but after lots of guidance and research on StackOverflow to finally come to this https://stackoverflow.com/questions/19183180/how-to-save-an-image-to-localstorage-and-display-it-on-the-next-page
+       * heavily chatGPT assisted for all the calculations and screenshot related code, but after lots of guidance and research on StackOverflow to finally come to this https://stackoverflow.com/questions/19183180/how-to-save-an-image-to-localstorage-and-display-it-on-the-next-page
+       * the game logic that is also found in this snippet of code was coded purely by human me
        */
       AFRAME.registerComponent('photo-capture', {
         init: function () {
@@ -210,12 +221,10 @@
             captionContainer.setAttribute('visible', true);
           }
 
-          // Prepare render‐target matching the plane's aspect
-          const pw  = parseFloat(photoPlaneEl.getAttribute('width'));
-          const ph  = parseFloat(photoPlaneEl.getAttribute('height'));
-          const rtW = Math.floor(window.innerWidth  * 0.3);
-          const rtH = Math.floor(rtW * (ph / pw));
-          const renderTarget = new THREE.WebGLRenderTarget(rtW, rtH);
+          // We'll now defer RT sizing until we know the current buffer size (VR or desktop hopefully)
+          const pw = parseFloat(photoPlaneEl.getAttribute('width'));
+          const ph = parseFloat(photoPlaneEl.getAttribute('height'));
+          let renderTarget;
 
           // Grab the Three.js mesh once it’s loaded
           let photoMesh = photoPlaneEl.getObject3D('mesh');
@@ -269,11 +278,15 @@
             finderFrameEl .setAttribute('visible', false);
             captureHUDel  .setAttribute('visible', false);
 
-            // Which peeps are in frame?
+            // Which peeps are in frame? (NEW : replace CSS based to renderer based, don't understand exactly what's going on here, but it's supposed to work on VR now)
             const fullW = renderer.domElement.width;
             const fullH = renderer.domElement.height;
-            const left  = (fullW - rtW) / 2;
-            const top   = (fullH - rtH) / 2;
+            // I) detection region: exactly trial and error again of buffer... ugh this is taking longer than I would want it to --> this is because the capture IDs and photo taken is not the same crop level for some reason
+            const detectFraction = 0.42;
+            const detW           = Math.floor(fullW * detectFraction);
+            const detH           = Math.floor(detW * (ph / pw));
+            const detLeft        = Math.floor((fullW - detW) / 2);
+            const detTop         = Math.floor((fullH - detH) / 2);
 
             const camPos = new THREE.Vector3();
             cameraEl.getWorldPosition(camPos);
@@ -292,7 +305,8 @@
               const ndc = worldPos.clone().project(cameraEl);
               const x   = (ndc.x + 1) / 2 * fullW;
               const y   = (1 - ndc.y) / 2 * fullH;
-              if (x >= left && x <= left + rtW && y >= top && y <= top + rtH) {
+              if (x >= detLeft && x <= detLeft + detW &&
+                  y >= detTop  && y <= detTop  + detH) { // II) do your hit-testing against detLeft, detTop, detW, detH
                 captured.push({
                   id:       peepEl.id,
                   type:     peepEl.dataset.peepType,
@@ -320,12 +334,22 @@
               const x   = (ndc.x + 1) / 2 * fullW;
               const y   = (1 - ndc.y) / 2 * fullH;
 
-              if (x >= left && x <= left + rtW && y >= top && y <= top + rtH) {
+              if (x >= detLeft && x <= detLeft + detW &&
+                  y >= detTop  && y <= detTop  + detH) { // II) do your hit-testing against detLeft, detTop, detW, detH
                 capturedPhones.push(phoneEl);
               }
             });
 
-            // Temporarily disable XR for a monoscopic render
+            // III) now for rendering, shrink to "number" --> trial and error
+            const displayFraction = 0.2;
+            const rtW             = Math.floor(fullW  * displayFraction);
+            const rtH             = Math.floor(rtW    * (ph / pw));
+            const left            = Math.floor((fullW - rtW) / 2);
+            const top             = Math.floor((fullH - rtH) / 2);
+
+            renderTarget          = new THREE.WebGLRenderTarget(rtW, rtH);
+
+            // Temporarily disable XR for a monoscopic render into our new RT
             const wasXR = renderer.xr.enabled;
             renderer.xr.enabled = false;
 
@@ -334,8 +358,12 @@
             cameraEl.aspect   = fullW / fullH;
             cameraEl.updateProjectionMatrix();
 
-            // Render sub-frustum
-            cameraEl.setViewOffset(fullW, fullH, left, fullH - top - rtH, rtW, rtH);
+            // Render exactly that sub-region
+            cameraEl.setViewOffset(
+              fullW, fullH,
+              left,  fullH - top - rtH,
+              rtW,   rtH
+            );
             renderer.setRenderTarget(renderTarget);
             renderer.clear();
             renderer.render(sceneEl.object3D, cameraEl);
@@ -347,12 +375,10 @@
             cameraEl.updateProjectionMatrix();
             renderer.xr.enabled = wasXR;
 
-            // Blit to in-scene plane
+            // 4) Swap that RT texture into your photoMesh
             if (photoMesh) {
               photoMesh.material.map         = renderTarget.texture;
               photoMesh.material.needsUpdate = true;
-              //phoneEl.setAttribute('visible', true);
-              //photoPlaneEl.setAttribute('visible', true);
             } else {
               console.warn('photoPlane mesh not ready');
             }
@@ -369,17 +395,18 @@
             } else {
               updateCaption('normalPeeps');
             }
+
+            // Show HUD again and make peeps look at their phones as well
             this.el.sceneEl.emit('start-capture-animation');
-            // Show HUD again
             captureHUDel.setAttribute('visible', true);
             
             // Schedule un‐skippable interval & auto-dismiss
             this.enableDismissTimer = setTimeout(() => {
               this.dismissActive = true;
-            }, 5000);
+            }, dismissTime);
             this.autoDismissTimer = setTimeout(() => {
               this.clearCapture();
-            }, 15000);
+            }, AUTO_DISMISS_TIME);
 
             // Switch from "capture" to "dismiss" listeners
             window   .removeEventListener('click'      , this.handleCapture);

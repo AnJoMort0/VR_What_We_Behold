@@ -1,5 +1,7 @@
 # VR What We Behold
 
+Test the latest prototype I tested in VR: https://anjomorto.itch.io/vrwwb-t. Password: VR-access
+
 **Fan quasi-VR-port of _We Become What We Behold_**  
 _Prototype Phase_
 
