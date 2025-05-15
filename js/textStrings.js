@@ -19,6 +19,7 @@ var textStrings_EN = {
 	// Act 2
 	"crazySquareAttacks": "CRAZED SQUARE ATTACKS",
 	"justMissed": "oooooh just missed it",
+	"subjectHidden": "oooh the subject's hiding!", // need to translate this to other languages
 	"somethingInteresting": "(ya gotta catch 'em doing *something* interesting...)",
 	"whoIsScreaming": "(ya gotta catch who's screaming at 'em)",
 	"circleFearsSquares": "CIRCLE FEARS SQUARES",

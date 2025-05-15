@@ -310,15 +310,16 @@
                 captured.push({
                   id:       peepEl.id,
                   type:     peepEl.dataset.peepType,
-                  distance: worldPos.distanceTo(camPos)
+                  distance: worldPos.distanceTo(camPos),
+                  xPosition: x,
                 });
               }
             });
             // store results
             this.capturedPeeps        = captured;
             window.lastCapturedPeeps  = captured;
-            //console.log('Captured peeps:', captured);
-            console.log('Captured peep IDs:', captured.map(peep => peep.id));
+            console.log('Captured peeps:', captured);
+            //console.log('Captured peep IDs:', captured.map(peep => peep.id));
 
             // Detect any phones in the shot
             const capturedPhones = [];
@@ -383,18 +384,45 @@
               console.warn('photoPlane mesh not ready');
             }
 
-            // Show caption/comment
+            ////////////////////////////////////////////////////////
+            // ------------------  GAME LOGIC  ------------------ //
+            ////////////////////////////////////////////////////////
+
+            // NOTHING
             if (captured.length === 0 && capturedPhones.length === 0) {
               updateCaption('wowNothing');
+
+            // ACT 1
+            // Hat Guy
             } else if (Act == 1 && captured.some(p => p.type === 'hat_guy')) {
-              updateCaption('niceHat', true);
+              const capturedHatGuy = captured.find(p => p.type === 'hat_guy'); // find the correct peep
+              // see if any other captured peep “blocks” it
+              const someoneInFront = captured.some(p => {
+                return p.id !== capturedHatGuy.id
+                    && Math.abs(p.xPosition - capturedHatGuy.xPosition) < 40
+                    && p.distance < capturedHatGuy.distance;
+              });
+              if (someoneInFront) {
+                updateCaption('subjectHidden');
+              } else {
+                updateCaption('niceHat', true);
+              }
+            
+            // DEFAULT
+            // Phone on phone
             } else if (capturedPhones.length > 0) {
               updateCaption('phoneOnPhone');
+            // A single normal peep
             } else if (captured.length === 1) {
               updateCaption('normalPeep');
             } else {
+            // A few normal peeps
               updateCaption('normalPeeps');
             }
+
+            ////////////////////////////////////////////////////////
+            ////////////////////////////////////////////////////////
+            ////////////////////////////////////////////////////////
 
             // Show HUD again and make peeps look at their phones as well
             this.el.sceneEl.emit('start-capture-animation');
