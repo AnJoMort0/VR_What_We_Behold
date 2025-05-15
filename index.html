@@ -11,7 +11,7 @@
       const PEEP_DEFAULT_SPEED  = 0.015;
 
       const bodyHeight = 1.6; // universal world unit tall
-      const bodyWidth  = (120 / 160) * bodyHeight; // the spritesheet is 120/140 but 160 makes them a little taller and more good looking in VR
+      const bodyWidth  = (120 / 180) * bodyHeight; // the spritesheet is 120/140 but 180 makes them a little taller and more good looking in VR
 
       let Act = 1;
 
@@ -520,7 +520,7 @@
        */
        AFRAME.registerComponent('capture-animation', {
         schema: {
-          lookOffset:   { type: 'vec2',   default: { x: 0.05, y: -0.05 } },
+          lookOffset:   { type: 'vec2',   default: { x: 0.04, y: -0.05 } },
           phoneSize:    { type: 'number', default: 0.2 },
           lookDuration: { type: 'number', default: 700 } // ms
         },
