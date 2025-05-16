@@ -134,12 +134,16 @@
        */
       AFRAME.registerComponent('game-manager', {
         init: function () {
+          const sceneEl   = this.el.sceneEl;
+
+          // listen for our “spawn the lovers” moment
+          sceneEl.addEventListener('spawn-lovers', () => this.spawnLovers());
+
           if (Act == 1 && Stage == "Stage_Start") {
             // after 5s, spawn the Hat Guy
             setTimeout(() => {
               Stage = "Stage_Hat";
 
-              const sceneEl   = this.el.sceneEl;
               const camObj    = sceneEl.camera;
               const worldPos  = new THREE.Vector3();
               camObj.getWorldPosition(worldPos);
@@ -176,23 +180,109 @@
 
               console.log("hat spawned");
             }, 5000);
-
-          } else if (Act == 1 && Stage == "Stage_Lovers") {
-            const sceneEl   = this.el.sceneEl;
-            const camObj    = sceneEl.camera;
-            const worldPos  = new THREE.Vector3();
-            camObj.getWorldPosition(worldPos);
-            const camDir    = new THREE.Vector3();
-            camObj.getWorldDirection(camDir);
-
-            // place him 3 units behind the camera
-            const spawnPos = worldPos.clone().add(camDir.multiplyScalar(-3));
-
-            // create the a-images for the Lovers Peeps
-            
           } else {
             return;
           }
+        },
+
+        spawnLovers: function () {
+          const sceneEl = this.el.sceneEl;
+          const cam     = sceneEl.camera;
+          // get a point 3 units behind the camera
+          const camPos  = new THREE.Vector3();
+          cam.getWorldPosition(camPos);
+          const camDir  = new THREE.Vector3();
+          cam.getWorldDirection(camDir);
+          const basePos = camPos.clone().add(camDir.multiplyScalar(-3));
+
+          // helper to build a lover peep
+          function makeLover(type, idSuffix, xOffset) {
+            const peepEl = document.createElement('a-entity');
+            peepEl.setAttribute('id', `lover-${type}-${idSuffix}`);
+            peepEl.setAttribute('data-peep-type', `lover_${type}`);
+            peepEl.setAttribute('mood', 'inLove');
+            // position: behind + a small left/right offset
+            peepEl.setAttribute(
+              'position',
+              `${basePos.x + xOffset} ${bodyHeight/2} ${basePos.z}`
+            );
+            // body
+            const body = document.createElement('a-image');
+            body.setAttribute('src',   '#bodySheet');
+            body.setAttribute('width',  bodyWidth);
+            body.setAttribute('height', bodyHeight);
+            body.setAttribute('spritesheet-animation', `
+              columns:2;
+              rows:1;
+              firstFrameIndex:${ type==='circle' ? 0 : 1 };
+              lastFrameIndex: ${ type==='circle' ? 0 : 1 };
+              frameDuration:  1;
+              loop:           false
+            `);
+            body.setAttribute('material', 'transparent:true;alphaTest:0.01');
+            peepEl.appendChild(body);
+
+            // shirt overlay
+            const shirt = document.createElement('a-image');
+            shirt.setAttribute('src',   '#lover_shirtSheet');
+            shirt.setAttribute('width',  bodyWidth);
+            shirt.setAttribute('height', bodyHeight);
+            shirt.setAttribute('spritesheet-animation', `
+              columns:2;
+              rows:1;
+              firstFrameIndex:${ type==='circle' ? 0 : 1 };
+              lastFrameIndex: ${ type==='circle' ? 0 : 1 };
+              frameDuration:  1;
+              loop:           false
+            `);
+            shirt.setAttribute('material', 'transparent:true;alphaTest:0.01');
+            peepEl.appendChild(shirt);
+
+            // face (frame 8)
+            const face = document.createElement('a-image');
+            face.setAttribute('src',   '#faceSheet');
+            face.setAttribute('width',  bodyWidth);
+            face.setAttribute('height', bodyHeight);
+            face.setAttribute('spritesheet-animation', `
+              columns:2;
+              rows:7;
+              firstFrameIndex:8;
+              lastFrameIndex: 8;
+              frameDuration:  0.5;
+              loop:           false
+            `);
+            face.setAttribute('position', '0.03 0.06 0.01');
+            face.setAttribute('material', 'transparent:true;alphaTest:0.01');
+            peepEl.appendChild(face);
+
+            // little love-hat above head
+            const lovehat = document.createElement('a-image');
+            lovehat.setAttribute('src',   '#lovehatSheet');
+            lovehat.setAttribute('width',  bodyWidth * 0.5);
+            lovehat.setAttribute('height', bodyHeight * 0.5);
+            lovehat.setAttribute('position', `0 0.27 0`);
+            lovehat.setAttribute('material', 'transparent:true;alphaTest:0.01');
+            peepEl.appendChild(lovehat);
+
+            // common extras
+            peepEl.setAttribute('billboard',      '');
+            peepEl.setAttribute('no-frustum-cull', '');
+            return peepEl;
+          }
+
+          // 3a) circle: normal random mover
+          const circle = makeLover('circle', 0, -bodyWidth*0.5);
+          circle.setAttribute('peep-mover', `speed:${PEEP_DEFAULT_SPEED}; radius:${PEEP_SPAWN_RADIUS}`);
+          sceneEl.appendChild(circle);
+          console.log("circle lover spawned");
+
+          // 3b) square: follow the circle
+          const square = makeLover('square', 0, +bodyWidth*0.5);
+          // remove its random mover if any, then add follow-target
+          square.components['peep-mover'] && square.removeAttribute('peep-mover');
+          square.setAttribute('follow-target', `target:#lover-circle-0; speed:${PEEP_DEFAULT_SPEED}`);
+          sceneEl.appendChild(square);
+          console.log("square lover spawned");
         }
       });
 
@@ -329,8 +419,10 @@
               if (x >= detLeft && x <= detLeft + detW &&
                   y >= detTop  && y <= detTop  + detH) { // II) do your hit-testing against detLeft, detTop, detW, detH
                 captured.push({
+                  peep:     peepEl,
                   id:       peepEl.id,
                   type:     peepEl.dataset.peepType,
+                  mood:     peepEl.getAttribute('mood'),
                   distance: worldPos.distanceTo(camPos),
                   xPosition: x,
                 });
@@ -436,7 +528,7 @@
 
                 // Remove the hat-guy
                 const hatGuy = sceneEl.querySelector('#hat_guy-0');
-                if (hatGuy) hatGuy.remove();
+                if (hatGuy) hatGuy.remove(); console.log("hat guy executed");
 
                 // Pick six random normal peeps
                 let normals = Array.from(sceneEl.querySelectorAll('[data-peep-type]')).filter(el => el.dataset.peepType !== 'hat_guy');
@@ -485,6 +577,7 @@
                 });
 
                 Stage = "Stage_Lovers";
+                this.el.sceneEl.emit('spawn-lovers');
               }
 
             // DEFAULT
@@ -626,6 +719,62 @@
           this.el.setAttribute('scale', `${flip} 1 1`);
         }
       });
+
+      /**
+       * FOLLOW-TARGET COMPONENT
+       * Permits the square lover to follow the circle lover
+       * Heavily chatGPT assisted
+       */
+      AFRAME.registerComponent('follow-target', {
+      schema: {
+        target:      { type: 'selector' },
+        speed:       { type: 'number', default: PEEP_DEFAULT_SPEED },
+        minDistance: { type: 'number', default: 0.6 },
+        tolerance:   { type: 'number', default: 0.3 }
+      },
+
+      init: function () {
+        // remember last world‐position for flip logic
+        this.prevPos = this.el.object3D.position.clone();
+      },
+
+      tick: function (time, delta) {
+        const data   = this.data;
+        const target = data.target;
+        if (!target) return;
+
+        const pos      = this.el.object3D.position;
+        const worldPos = new THREE.Vector3();
+        target.object3D.getWorldPosition(worldPos);
+
+        // compute horizontal vector toward target
+        const dir  = worldPos.clone().sub(pos);
+        dir.y = 0;
+        const dist = dir.length();
+        if (dist < 1e-3) return;
+        const dirNorm = dir.clone().normalize();
+
+        // If we're too far step forward
+        if (dist > data.minDistance + data.tolerance) {
+          const moveAmt = data.speed * (delta / 16);
+          pos.addScaledVector(dirNorm, moveAmt);
+        // If we're too close snap back
+        } else if (dist < data.minDistance - data.tolerance) {
+          pos.copy(
+            worldPos.clone().sub(dirNorm.multiplyScalar(data.minDistance))
+          );
+        }
+        this.el.object3D.position.copy(pos);
+
+        // Maintain whatever flip you had on-screen
+        const cam     = this.el.sceneEl.camera;
+        const ndcPrev = this.prevPos.clone().project(cam);
+        const ndcCurr = pos.clone().project(cam);
+        const flip    = ndcCurr.x > ndcPrev.x ? 1 : -1;
+        this.el.setAttribute('scale', `${flip} 1 1`);
+        this.prevPos.copy(pos);
+      }
+    });
 
       /**
        * BILLBOARD COMPONENT
@@ -928,6 +1077,8 @@
         <img id = "bodySheet"         src = "sprites/peeps/body.png" />
         <img id = "faceSheet"         src = "sprites/peeps/face.png" />
         <img id = "hatguySheet"       src = "sprites/peeps/hatguy.png" />
+        <img id = "lover_shirtSheet"  src = "sprites/peeps/lover_shirt.png" />
+        <img id = "lovehatSheet"      src = "sprites/peeps/lovehat.png" />
 
         <img id = "hatSheet"          src = "sprites/peeps/hat.png" />
       </a-assets>
