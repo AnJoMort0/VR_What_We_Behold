@@ -16,7 +16,8 @@
       const bodyHeight = 1.6; // universal world unit tall
       const bodyWidth  = (120 / 180) * bodyHeight; // the spritesheet is 120/140 but 180 makes them a little taller and more good looking in VR
 
-      let Act = 1;
+      let Act   = 1;
+      let Stage = "Stage_Start";
 
       /**
        * SPRITESHEET-ANIMATION COMPONENT
@@ -29,7 +30,7 @@
           columns:         { type: 'number', default: 1 },
           firstFrameIndex: { type: 'number', default: 0 },
           lastFrameIndex:  { type: 'number', default: -1 },
-          frameDuration:   { type: 'number', default: 1 }, // seconds
+          frameDuration:   { type: 'number', default: 0.1 }, // seconds
           loop:            { type: 'boolean', default: true }
         },
 
@@ -74,6 +75,11 @@
         }
       });
 
+       /**
+       * DEBUG-TOGGLE COMPONENT
+       * I use this to create dev tools for testing
+       * chatGPT assisted
+       */
       AFRAME.registerComponent('debug-toggle', { // chatGPT assisted
         init: function () {
           window.DEBUG = false;
@@ -128,9 +134,11 @@
        */
       AFRAME.registerComponent('game-manager', {
         init: function () {
-          if (Act == 1) {
+          if (Act == 1 && Stage == "Stage_Start") {
             // after 5s, spawn the Hat Guy
             setTimeout(() => {
+              Stage = "Stage_Hat";
+
               const sceneEl   = this.el.sceneEl;
               const camObj    = sceneEl.camera;
               const worldPos  = new THREE.Vector3();
@@ -169,6 +177,19 @@
               console.log("hat spawned");
             }, 5000);
 
+          } else if (Act == 1 && Stage == "Stage_Lovers") {
+            const sceneEl   = this.el.sceneEl;
+            const camObj    = sceneEl.camera;
+            const worldPos  = new THREE.Vector3();
+            camObj.getWorldPosition(worldPos);
+            const camDir    = new THREE.Vector3();
+            camObj.getWorldDirection(camDir);
+
+            // place him 3 units behind the camera
+            const spawnPos = worldPos.clone().add(camDir.multiplyScalar(-3));
+
+            // create the a-images for the Lovers Peeps
+            
           } else {
             return;
           }
@@ -391,10 +412,11 @@
             // NOTHING
             if (captured.length === 0 && capturedPhones.length === 0) {
               updateCaption('wowNothing');
+              this.el.sceneEl.emit('start-capture-animation');
 
             // ACT 1
             // Hat Guy
-            } else if (Act == 1 && captured.some(p => p.type === 'hat_guy')) {
+            } else if (Act == 1 && Stage == "Stage_Hat" && captured.some(p => p.type === 'hat_guy')) {
               const capturedHatGuy = captured.find(p => p.type === 'hat_guy'); // find the correct peep
               // see if any other captured peep “blocks” it
               const someoneInFront = captured.some(p => {
@@ -404,20 +426,80 @@
               });
               if (someoneInFront) {
                 updateCaption('subjectHidden');
+                this.el.sceneEl.emit('start-capture-animation');
+
               } else {
                 updateCaption('niceHat', true);
+                this.el.sceneEl.emit('start-capture-animation');
+                  
+                const sceneEl = this.el.sceneEl;
+
+                // Remove the hat-guy
+                const hatGuy = sceneEl.querySelector('#hat_guy-0');
+                if (hatGuy) hatGuy.remove();
+
+                // Pick six random normal peeps
+                let normals = Array.from(sceneEl.querySelectorAll('[data-peep-type]')).filter(el => el.dataset.peepType !== 'hat_guy');
+                normals.sort(() => 0.5 - Math.random());
+                const chosen = normals.slice(0, 6);
+
+                // For each, attach a hat, set mood, swap face
+                chosen.forEach(peepEl => {
+                  // Hat sprite
+                  const hat = document.createElement('a-image');
+                  hat.setAttribute('src',    '#hatSheet');
+                  hat.setAttribute('width',   bodyWidth * 0.75);
+                  hat.setAttribute('position', `0.13 0.64 0.01`);
+                  hat.setAttribute('spritesheet-animation', {
+                    columns:          4,
+                    rows:             8,
+                    firstFrameIndex:  0,
+                    lastFrameIndex:   14,
+                    frameDuration:    0.1,
+                    loop:             false
+                  });
+                  hat.setAttribute('material', 'transparent:true;alphaTest:0.01');
+                  peepEl.appendChild(hat);
+
+                  // Mood
+                  peepEl.setAttribute('mood', 'hatted');
+
+                  // Couldn't just swap the face for some reason, so instead I just replace it to the "proud" face (frame 6)
+                  peepEl.removeChild(peepEl.querySelector('a-image[src="#faceSheet"]'));
+                  const face = document.createElement('a-image');
+                  face.setAttribute('src',   '#faceSheet');
+                  face.setAttribute('width',  bodyWidth);
+                  face.setAttribute('height', bodyHeight);
+                  face.setAttribute('position', `0.04 0.18 0.01`);
+                  face.setAttribute('spritesheet-animation', `
+                    columns:         2;
+                    rows:            7;
+                    firstFrameIndex: 6;
+                    lastFrameIndex:  6;
+                    frameDuration:   0.5;
+                    loop:            true;
+                  `);
+                  // Prevents png invisible parts collision
+                  face.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+                  peepEl.appendChild(face);
+                });
+
+                Stage = "Stage_Lovers";
               }
-            
+
             // DEFAULT
             // Phone on phone
             } else if (capturedPhones.length > 0) {
               updateCaption('phoneOnPhone');
+              this.el.sceneEl.emit('start-capture-animation');
             // A single normal peep
             } else if (captured.length === 1) {
               updateCaption('normalPeep');
+              this.el.sceneEl.emit('start-capture-animation');
             } else {
             // A few normal peeps
               updateCaption('normalPeeps');
+              this.el.sceneEl.emit('start-capture-animation');
             }
 
             ////////////////////////////////////////////////////////
@@ -425,7 +507,6 @@
             ////////////////////////////////////////////////////////
 
             // Show HUD again and make peeps look at their phones as well
-            this.el.sceneEl.emit('start-capture-animation');
             captureHUDel.setAttribute('visible', true);
             
             // Schedule un‐skippable interval & auto-dismiss
@@ -626,7 +707,7 @@
             // animate up into view
             phone.setAttribute('animation__phonein', `
               property: position;
-              to:       0.18 0.1 0.001;
+              to:       0.25 0.1 0.001;
               dur:      ${lookDuration};
               easing:   easeOutQuad;
               loop:     false
@@ -781,14 +862,7 @@
             face.setAttribute('src',   '#faceSheet');
             face.setAttribute('width',  bodyWidth);
             face.setAttribute('height', bodyHeight);
-            // Shift left a bit for squares because it's not lining up for some reason
-            const faceXOffset = type === 'square'
-              ? - bodyWidth * 0.07
-              : 0;
-            face.setAttribute(
-              'position',
-              `${faceXOffset} ${bodyHeight * 0.25} 0.01`
-            );
+            face.setAttribute('position', `0.04 ${bodyHeight * 0.25} 0.01`);
             face.setAttribute('spritesheet-animation', `
               columns:         2;
               rows:            7;
@@ -854,6 +928,8 @@
         <img id = "bodySheet"         src = "sprites/peeps/body.png" />
         <img id = "faceSheet"         src = "sprites/peeps/face.png" />
         <img id = "hatguySheet"       src = "sprites/peeps/hatguy.png" />
+
+        <img id = "hatSheet"          src = "sprites/peeps/hat.png" />
       </a-assets>
 
       <!-- Player camera -->
