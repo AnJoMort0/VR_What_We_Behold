@@ -13,6 +13,7 @@ An experimental virtual-reality adaptation of Nicky Case’s satirical news-cycl
 
 - **Head-tracked aiming** (or mouse/touch) 
 - **Controller support**
+- **Social Media like capture instead of TV**
 
 ---
 
