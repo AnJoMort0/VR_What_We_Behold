@@ -173,6 +173,7 @@
               // standard behaviors
               hatGuy.setAttribute('billboard', '');
               hatGuy.setAttribute('peep-mover', `speed : 0.01; radius : 8`);
+              hatGuy.setAttribute('peep-flipper', '');
               hatGuy.setAttribute('no-frustum-cull', '');
               hatGuy.setAttribute('material', 'transparent: true; alphaTest: 0.01');
 
@@ -273,6 +274,7 @@
           // 3a) circle: normal random mover
           const circle = makeLover('circle', 0, -bodyWidth*0.5);
           circle.setAttribute('peep-mover', `speed:${PEEP_DEFAULT_SPEED}; radius:${PEEP_SPAWN_RADIUS}`);
+          circle.setAttribute('peep-flipper', '');
           sceneEl.appendChild(circle);
           console.log("circle lover spawned");
 
@@ -580,69 +582,75 @@
                 this.el.sceneEl.emit('spawn-lovers');
               }
 
-            // ACT 1
             // Lovers
-            } else if (Act == 1 && Stage == "Stage_Lovers" && captured.some(p => p.type === 'lover_circle') && captured.some(p => p.type === 'lover_square')) {
+            } else if (captured.some(p => p.type === 'lover_circle') && captured.some(p => p.type === 'lover_square')) {
               const capturedCircleLover = captured.find(p => p.type === 'lover_circle'); // find the correct peeps
-              const clPeepEl            = capturedCircleLover.el;
-              const clFace = clPeepEl.querySelector('a-image[src="#faceSheet"]');
+              const circEl              = capturedCircleLover.el;
               const capturedSquareLover = captured.find(p => p.type === 'lover_square');
-              const slPeepEl            = capturedSquareLover.el;
-              const slFace = slPeepEl.querySelector('a-image[src="#faceSheet"]');
+              const sqrEl               = capturedSquareLover.el;
 
-              if (clPeepEl.getAttribute('mood') !== 'embarassed') {
-                updateCaption('getARoom', true);
-            
-                clFace.setAttribute('position', `0.07 0.08 0.01`);
-                clFace.setAttribute('scale'   , '0.8 0.8 1');
-                clFace.setAttribute('spritesheet-animation', `
-                  columns:         2;
-                  rows:            7;
-                  firstFrameIndex: 9;
-                  lastFrameIndex:  9;
-                  frameDuration:   0.5;
-                  loop:            true;
-                `);
-                clPeepEl.setAttribute('mood', 'embarassed');
+              [circEl, sqrEl].forEach(peepEl => {
+                const face = peepEl.querySelector('a-image[src="#faceSheet"]');
+                const mood = peepEl.getAttribute('mood');
 
-                slFace.setAttribute('position', `0.07 0.08 0.01`);
-                slFace.setAttribute('scale'   , '0.8 0.8 1');
-                slFace.setAttribute('spritesheet-animation', `
-                  columns:         2;
-                  rows:            7;
-                  firstFrameIndex: 9;
-                  lastFrameIndex:  9;
-                  frameDuration:   0.5;
-                  loop:            true;
-                `);
-                slPeepEl.setAttribute('mood', 'embarassed');
-              } else {
-                updateCaption('outtaHere', true);
+                if (mood === 'inLove') {
+                  updateCaption('getARoom', true);
+                  Act = 2;
+                  Stage = 'Stage_Screamer'
 
-                // These faces won't be visible now, since we delete the peeps here, but later when the walk out animation will happen these faces will be visible
-                clFace.setAttribute('spritesheet-animation', `
-                  columns:         2;
-                  rows:            7;
-                  firstFrameIndex: 10;
-                  lastFrameIndex:  10;
-                  frameDuration:   0.5;
-                  loop:            true;
-                `);
-                clPeepEl.setAttribute('mood', 'escaping');
+                  face.setAttribute('position', `0.07 0.08 0.01`);
+                  face.setAttribute('scale',    '0.8 0.8 1');
+                  face.setAttribute('spritesheet-animation', `
+                    columns:         2;
+                    rows:            7;
+                    firstFrameIndex: 9;
+                    lastFrameIndex:  9;
+                    frameDuration:   0.5;
+                    loop:            true;
+                  `);
 
-                slFace.setAttribute('spritesheet-animation', `
-                  columns:         2;
-                  rows:            7;
-                  firstFrameIndex: 10;
-                  lastFrameIndex:  10;
-                  frameDuration:   0.5;
-                  loop:            true;
-                `);
-                slPeepEl.setAttribute('mood', 'escaping');
-                
-                if (clPeepEl) clPeepEl.remove(); console.log("circle lover executed");
-                if (slPeepEl) slPeepEl.remove(); console.log("square lover executed");
-              }
+                  peepEl.setAttribute('mood', 'embarassed');
+
+                  // 1) kill their random mover
+                  peepEl.removeAttribute('peep-mover');
+
+                  // 2) compute an “exit” target a bit to camera’s right & far away in Z
+                  const camPos = new THREE.Vector3();
+                  this.el.sceneEl.camera.getWorldPosition(camPos);
+                  const exitX = camPos.x + 13;
+                  const exitZ = camPos.z - 30;
+                  const exitY = bodyHeight / 2;
+
+                  // 3) animate them moving off
+                  peepEl.setAttribute('animation__runoff', {
+                    property: 'position',
+                    to:       `${exitX} ${exitY} ${exitZ}`,
+                    dur:      15000,
+                    easing:   'linear',
+                  });
+
+                  // 4) once that’s done, remove them
+                  peepEl.addEventListener('animationcomplete__runoff', () => {
+                    if (peepEl.parentNode) peepEl.parentNode.removeChild(peepEl); console.log(peepEl.id + " executed");
+                  }, { once: true });
+
+                } else {
+                  updateCaption('outtaHere');
+
+                  face.setAttribute('spritesheet-animation', `
+                    columns:         2;
+                    rows:            7;
+                    firstFrameIndex: 10;
+                    lastFrameIndex:  10;
+                    frameDuration:   0.1;
+                    loop:            true;
+                  `);
+                  peepEl.setAttribute('mood', 'escaping');
+
+                }
+              });
+
+              // advance to next stage
 
             // DEFAULT
             // Phone on phone
@@ -726,7 +734,7 @@
 
       /**
        * PEEP-MOVER COMPONENT
-       * Moves the peep randomly in the XZ plane, bounces back when leaving radius, and flips entity horizontally based on movement direction.
+       * Moves the peep randomly in the XZ plane, bounces back when leaving radius.
        * Moderately chatGPT assisted.
        */
       AFRAME.registerComponent('peep-mover', {
@@ -768,19 +776,34 @@
           }
 
           this.el.object3D.position.copy(pos);
+        }
+      });
 
-          // — NEW FLIP LOGIC, heavily chatGPT assisted — project both positions to camera NDC
+      /**
+       * PEEP-FLIPPER COMPONENT
+       * Flips the entity horizontally depending on the side it's facing
+       * Previously within peep-mover, let's me change remove the random peep-mover of the peeps, while keeping the flipping.
+       * Copy-pasted from before
+       */
+      AFRAME.registerComponent('peep-flipper', {
+        init: function () {
+          this.prevPos = this.el.object3D.position.clone();
+        },
+        tick: function () {
+          const pos     = this.el.object3D.position;
+          const prevPos = this.prevPos;
           const cam     = this.el.sceneEl.camera;
+
+          // project into NDC
           const ndcPrev = prevPos.clone().project(cam);
           const ndcCurr = pos.clone().project(cam);
-          // if it moved right on screen, keep scale=1; otherwise flip
-          let flip;
-          if (ndcCurr.x > ndcPrev.x) {
-              flip = 1;
-          } else {
-              flip = -1;
-          }
+          const flip    = ndcCurr.x > ndcPrev.x ? 1 : -1;
+
+          // apply
           this.el.setAttribute('scale', `${flip} 1 1`);
+
+          // store for next frame
+          this.prevPos.copy(pos);
         }
       });
 
@@ -793,8 +816,8 @@
       schema: {
         target:      { type: 'selector' },
         speed:       { type: 'number', default: PEEP_DEFAULT_SPEED },
-        minDistance: { type: 'number', default: 0.55 },
-        tolerance:   { type: 'number', default: 0.3 }
+        minDistance: { type: 'number', default: 0.6 },
+        tolerance:   { type: 'number', default: 0.4 }
       },
 
       init: function () {
@@ -1097,6 +1120,7 @@
               'peep-mover',
               `speed: ${0.01 + Math.random() * 0.01}; radius: ${this.data.radius}`
             );
+            peepEl.setAttribute('peep-flipper', '');
             peepEl.setAttribute('no-frustum-cull', '');
 
             // --- DEBUG: Floating ID label over each peep - chatGPT generated ---
