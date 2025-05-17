@@ -955,10 +955,11 @@
         },
 
         init: function () {
-          this.originalSpeeds  = new Map();
-          this.originalFacePos = new Map();
-          this.originalTicks   = new Map();
-          this.animating       = false;
+          this.originalSpeeds       = new Map();
+          this.originalFacePos      = new Map();
+          this.originalMoverTicks   = new Map();
+          this.originalFlipperTicks = new Map();
+          this.animating            = false;
 
           this.el.addEventListener('start-capture-animation', () => {
             if (!this.animating) this.runStart();
@@ -974,16 +975,24 @@
           const peeps = Array.from(this.el.querySelectorAll('[data-peep-type]'));
 
           peeps.forEach(peepEl => {
-            // 1) Halt their movement
+            // 1a) Halt their movement
             const mover = peepEl.components['peep-mover'];
             if (mover) {
               // remember its speed
               this.originalSpeeds.set(peepEl, mover.data.speed);
               // remember its tick function
-              this.originalTicks.set(peepEl, mover.tick.bind(mover));
-              // disable both movement & flip
+              this.originalMoverTicks.set(peepEl, mover.tick.bind(mover));
+              // disable movement
               mover.tick = () => {};
               mover.data.speed = 0;
+            }
+
+            // 1b) Halt flipping
+            const flipper = peepEl.components['peep-flipper'];
+            if (flipper) {
+              // remember its flip
+              this.originalFlipperTicks.set(peepEl, flipper.tick.bind(flipper));
+              flipper.tick = () => {};
             }
             // snap to whatever flip they had at the moment
             const origScale = peepEl.getAttribute('scale');
@@ -1055,16 +1064,22 @@
               `);
             }
 
-            // 3) After the animation finishes, restore & clean up
+            // 3 After the animation finishes, restore & clean up
             setTimeout(() => {
-              // restore mover speed
+              // 3a) restore mover speed
               const mover = peepEl.components['peep-mover'];
-              if (mover && this.originalTicks.has(peepEl)) {
-                mover.tick = this.originalTicks.get(peepEl);
+              if (mover && this.originalMoverTicks.has(peepEl)) {
+                mover.tick = this.originalMoverTicks.get(peepEl);
                 const speed = this.originalSpeeds.get(peepEl);
                 peepEl.setAttribute('peep-mover', `speed: ${speed}`);
-                this.originalTicks.delete(peepEl);
+                this.originalMoverTicks.delete(peepEl);
                 this.originalSpeeds.delete(peepEl);
+              }
+              // 3b) restore flipper
+              const flipper = peepEl.components['peep-flipper'];
+              if (flipper && this.originalFlipperTicks.has(peepEl)) {
+                flipper.tick = this.originalFlipperTicks.get(peepEl);
+                this.originalFlipperTicks.delete(peepEl);
               }
               // remove the phone entity
               if (phone && phone.parentNode) {
