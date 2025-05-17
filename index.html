@@ -69,9 +69,9 @@
           const offsetY = (d.rows - row - 1) / d.rows;
 
           if (this.mesh.material.map) {
-            this.mesh.material.map.repeat.set(this.repeatX, this.repeatY);
-            this.mesh.material.map.offset.set(offsetX, offsetY);
-          }
+          this.mesh.material.map.repeat.set(this.repeatX, this.repeatY);
+          this.mesh.material.map.offset.set(offsetX, offsetY);
+        }
         }
       });
 
@@ -160,14 +160,14 @@
               hatGuy.setAttribute('src', '#hatguySheet');
               hatGuy.setAttribute('width',  bodyWidth);
               hatGuy.setAttribute('height', bodyHeight);
-              hatGuy.setAttribute('spritesheet-animation', `
-                columns:1;
-                rows:1;
-                firstFrameIndex:0;
-                lastFrameIndex:0;
-                frameDuration:1;
-                loop:false;
-              `);
+              hatGuy.setAttribute('spritesheet-animation', {
+                columns:          1,
+                rows:             1,
+                firstFrameIndex:  0,
+                lastFrameIndex:   0,
+                frameDuration:    1,
+                loop:             false
+              });
               hatGuy.setAttribute('position', `${spawnPos.x} ${bodyHeight/2} ${spawnPos.z}`);
 
               // standard behaviors
@@ -212,14 +212,14 @@
             body.setAttribute('src',   '#bodySheet');
             body.setAttribute('width',  bodyWidth);
             body.setAttribute('height', bodyHeight);
-            body.setAttribute('spritesheet-animation', `
-              columns:2;
-              rows:1;
-              firstFrameIndex:${ type==='circle' ? 0 : 1 };
-              lastFrameIndex: ${ type==='circle' ? 0 : 1 };
-              frameDuration:  1;
-              loop:           false
-            `);
+            body.setAttribute('spritesheet-animation', {
+              columns:          2,
+              rows:             1,
+              firstFrameIndex:  type === 'circle' ? 0 : 1,
+              lastFrameIndex:   type === 'circle' ? 0 : 1,
+              frameDuration:    1,
+              loop:             false
+            });
             body.setAttribute('material', 'transparent:true;alphaTest:0.01');
             peepEl.appendChild(body);
 
@@ -228,14 +228,14 @@
             shirt.setAttribute('src',   '#lover_shirtSheet');
             shirt.setAttribute('width',  bodyWidth);
             shirt.setAttribute('height', bodyHeight);
-            shirt.setAttribute('spritesheet-animation', `
-              columns:2;
-              rows:1;
-              firstFrameIndex:${ type==='circle' ? 0 : 1 };
-              lastFrameIndex: ${ type==='circle' ? 0 : 1 };
-              frameDuration:  1;
-              loop:           false
-            `);
+            shirt.setAttribute('spritesheet-animation', {
+              columns:          2,
+              rows:             1,
+              firstFrameIndex:  type === 'circle' ? 0 : 1,
+              lastFrameIndex:   type === 'circle' ? 0 : 1,
+              frameDuration:    1,
+              loop:             false
+            });
             shirt.setAttribute('material', 'transparent:true;alphaTest:0.01');
             peepEl.appendChild(shirt);
 
@@ -244,14 +244,14 @@
             face.setAttribute('src',   '#faceSheet');
             face.setAttribute('width',  bodyWidth);
             face.setAttribute('height', bodyHeight);
-            face.setAttribute('spritesheet-animation', `
-              columns:2;
-              rows:7;
-              firstFrameIndex:8;
-              lastFrameIndex: 8;
-              frameDuration:  0.5;
-              loop:           false
-            `);
+            face.setAttribute('spritesheet-animation', {
+              columns:          2,
+              rows:             7,
+              firstFrameIndex:  8,
+              lastFrameIndex:   8,
+              frameDuration:    0.5,
+              loop:             false
+            });
             face.setAttribute('position', '0.03 0.06 0.01');
             face.setAttribute('material', 'transparent:true;alphaTest:0.01');
             peepEl.appendChild(face);
@@ -565,14 +565,14 @@
                   face.setAttribute('width',  bodyWidth);
                   face.setAttribute('height', bodyHeight);
                   face.setAttribute('position', `0.04 0.18 0.01`);
-                  face.setAttribute('spritesheet-animation', `
-                    columns:         2;
-                    rows:            7;
-                    firstFrameIndex: 6;
-                    lastFrameIndex:  6;
-                    frameDuration:   0.5;
-                    loop:            true;
-                  `);
+                  face.setAttribute('spritesheet-animation', {
+                    columns:         2,
+                    rows:            7,
+                    firstFrameIndex: 6,
+                    lastFrameIndex:  6,
+                    frameDuration:   0.5,
+                    loop:            true,
+                  });
                   // Prevents png invisible parts collision
                   face.setAttribute('material', 'transparent: true; alphaTest: 0.01');
                   peepEl.appendChild(face);
@@ -595,19 +595,20 @@
 
                 if (mood === 'inLove') {
                   updateCaption('getARoom', true);
+                  this.el.sceneEl.emit('start-capture-animation');
                   Act = 2;
                   Stage = 'Stage_Screamer'
 
                   face.setAttribute('position', `0.07 0.08 0.01`);
                   face.setAttribute('scale',    '0.8 0.8 1');
-                  face.setAttribute('spritesheet-animation', `
-                    columns:         2;
-                    rows:            7;
-                    firstFrameIndex: 9;
-                    lastFrameIndex:  9;
-                    frameDuration:   0.5;
-                    loop:            true;
-                  `);
+                  face.setAttribute('spritesheet-animation', {
+                    columns:          2,
+                    rows:             7,
+                    firstFrameIndex:  9,
+                    lastFrameIndex:   9,
+                    frameDuration:    0.5,
+                    loop:             true
+                  });
 
                   peepEl.setAttribute('mood', 'embarassed');
 
@@ -636,21 +637,77 @@
 
                 } else {
                   updateCaption('outtaHere');
+                  this.el.sceneEl.emit('start-capture-animation');
 
-                  face.setAttribute('spritesheet-animation', `
-                    columns:         2;
-                    rows:            7;
-                    firstFrameIndex: 10;
-                    lastFrameIndex:  10;
-                    frameDuration:   0.1;
-                    loop:            true;
-                  `);
+                  face.setAttribute('spritesheet-animation', {
+                    columns:          2,
+                    rows:             7,
+                    firstFrameIndex:  10,
+                    lastFrameIndex:   10,
+                    frameDuration:    0.1,
+                    loop:             true
+                  });
                   peepEl.setAttribute('mood', 'escaping');
 
                 }
               });
 
-              // advance to next stage
+            // Hatted Peep
+            } else if (captured.some(p => p.mood === 'hatted')) {
+              updateCaption('notCoolAnymore');
+              this.el.sceneEl.emit('start-capture-animation');
+
+              captured.filter(p => p.mood === 'hatted').forEach(p => {
+                const peepEl  = p.el;
+                const face    = peepEl.querySelector('a-image[src="#faceSheet"]');
+                const hat     = peepEl.querySelector('a-image[src="#hatSheet"]');
+
+                face.setAttribute('scale',    '0.75 0.75 1');
+                face.setAttribute('spritesheet-animation', {
+                  columns:          2,
+                  rows:             7,
+                  firstFrameIndex:  7,  // embarassed face
+                  lastFrameIndex:   7,
+                  frameDuration:    0.5,
+                  loop:             true
+                });
+
+                setTimeout(() => {
+                  hat.setAttribute('spritesheet-animation', {
+                    columns:          4,
+                    rows:             8,
+                    firstFrameIndex:  14, // take out the hat --> a little cropping problem to solve in the future
+                    lastFrameIndex:   25,
+                    frameDuration:    0.1,
+                    loop:             false
+                  });
+                }, 1000);
+
+                setTimeout(() => {
+                  // Couldn't just swap the face for some reason, so instead I just replace it to the "neutral" face
+                  peepEl.removeChild(face);
+                  const newFace = document.createElement('a-image');
+                  newFace.setAttribute('src',   '#faceSheet');
+                  newFace.setAttribute('width',  bodyWidth);
+                  newFace.setAttribute('height', bodyHeight);
+                  newFace.setAttribute('position', `0.04 ${bodyHeight * 0.25} 0.01`);
+                  newFace.setAttribute('spritesheet-animation', {
+                    columns:          2,
+                    rows:             7,
+                    firstFrameIndex:  0,
+                    lastFrameIndex:   0,
+                    frameDuration:    3,
+                    loop:             true
+                  });
+                  // Prevents png invisible parts collision
+                  newFace.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+                  peepEl.appendChild(newFace);
+                  peepEl.removeChild(hat);
+                }, 5000);
+
+                  peepEl.setAttribute('mood', 'neutral');
+
+              });
 
             // DEFAULT
             // Phone on phone
@@ -955,13 +1012,13 @@
             if (face) {
               const orig = face.getAttribute('position');
               this.originalFacePos.set(face, { ...orig });
-              face.setAttribute('animation__lookdown', `
-                property: position;
-                to:       ${orig.x + lookOffset.x} ${orig.y + lookOffset.y} ${orig.z};
-                dur:      ${lookDuration};
-                easing:   easeOutQuad;
+              face.setAttribute('animation__lookdown', {
+                property: 'position',
+                to:       `${orig.x + lookOffset.x} ${orig.y + lookOffset.y} ${orig.z}`,
+                dur:      lookDuration,
+                easing:   'easeOutQuad',
                 loop:     false
-              `);
+              });
             }
           });
         },
@@ -1081,14 +1138,14 @@
             body.setAttribute('src', '#bodySheet');
             body.setAttribute('width',  bodyWidth);
             body.setAttribute('height', bodyHeight);
-            body.setAttribute('spritesheet-animation', `
-              columns:       2;
-              rows:          1;
-              firstFrameIndex: ${ type === 'circle' ? 0 : 1 };
-              lastFrameIndex:  ${ type === 'circle' ? 0 : 1 };
-              frameDuration:   1;
-              loop:            false;
-            `);
+            body.setAttribute('spritesheet-animation', {
+              columns:          2,
+              rows:             1,
+              firstFrameIndex:  type === 'circle' ? 0 : 1,
+              lastFrameIndex:   type === 'circle' ? 0 : 1,
+              frameDuration:    1,
+              loop:             false
+            });
             // Prevents png invisible parts collision
             body.setAttribute('material', 'transparent: true; alphaTest: 0.01');
             peepEl.appendChild(body);
@@ -1099,14 +1156,14 @@
             face.setAttribute('width',  bodyWidth);
             face.setAttribute('height', bodyHeight);
             face.setAttribute('position', `0.04 ${bodyHeight * 0.25} 0.01`);
-            face.setAttribute('spritesheet-animation', `
-              columns:         2;
-              rows:            7;
-              firstFrameIndex: 0;
-              lastFrameIndex:  0;
-              frameDuration:   0.5;
-              loop:            true;
-            `);
+            face.setAttribute('spritesheet-animation', {
+              columns:          2,
+              rows:             7,
+              firstFrameIndex:  0,
+              lastFrameIndex:   0,
+              frameDuration:    0.5,
+              loop:             true
+            });
             // Prevents png invisible parts collision
             face.setAttribute('material', 'transparent: true; alphaTest: 0.01');
             peepEl.appendChild(face);
