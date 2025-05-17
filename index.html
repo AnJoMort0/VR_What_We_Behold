@@ -419,7 +419,7 @@
               if (x >= detLeft && x <= detLeft + detW &&
                   y >= detTop  && y <= detTop  + detH) { // II) do your hit-testing against detLeft, detTop, detW, detH
                 captured.push({
-                  peep:     peepEl,
+                  el:       peepEl,
                   id:       peepEl.id,
                   type:     peepEl.dataset.peepType,
                   mood:     peepEl.getAttribute('mood'),
@@ -580,6 +580,70 @@
                 this.el.sceneEl.emit('spawn-lovers');
               }
 
+            // ACT 1
+            // Lovers
+            } else if (Act == 1 && Stage == "Stage_Lovers" && captured.some(p => p.type === 'lover_circle') && captured.some(p => p.type === 'lover_square')) {
+              const capturedCircleLover = captured.find(p => p.type === 'lover_circle'); // find the correct peeps
+              const clPeepEl            = capturedCircleLover.el;
+              const clFace = clPeepEl.querySelector('a-image[src="#faceSheet"]');
+              const capturedSquareLover = captured.find(p => p.type === 'lover_square');
+              const slPeepEl            = capturedSquareLover.el;
+              const slFace = slPeepEl.querySelector('a-image[src="#faceSheet"]');
+
+              if (clPeepEl.getAttribute('mood') !== 'embarassed') {
+                updateCaption('getARoom', true);
+            
+                clFace.setAttribute('position', `0.07 0.08 0.01`);
+                clFace.setAttribute('scale'   , '0.8 0.8 1');
+                clFace.setAttribute('spritesheet-animation', `
+                  columns:         2;
+                  rows:            7;
+                  firstFrameIndex: 9;
+                  lastFrameIndex:  9;
+                  frameDuration:   0.5;
+                  loop:            true;
+                `);
+                clPeepEl.setAttribute('mood', 'embarassed');
+
+                slFace.setAttribute('position', `0.07 0.08 0.01`);
+                slFace.setAttribute('scale'   , '0.8 0.8 1');
+                slFace.setAttribute('spritesheet-animation', `
+                  columns:         2;
+                  rows:            7;
+                  firstFrameIndex: 9;
+                  lastFrameIndex:  9;
+                  frameDuration:   0.5;
+                  loop:            true;
+                `);
+                slPeepEl.setAttribute('mood', 'embarassed');
+              } else {
+                updateCaption('outtaHere', true);
+
+                // These faces won't be visible now, since we delete the peeps here, but later when the walk out animation will happen these faces will be visible
+                clFace.setAttribute('spritesheet-animation', `
+                  columns:         2;
+                  rows:            7;
+                  firstFrameIndex: 10;
+                  lastFrameIndex:  10;
+                  frameDuration:   0.5;
+                  loop:            true;
+                `);
+                clPeepEl.setAttribute('mood', 'escaping');
+
+                slFace.setAttribute('spritesheet-animation', `
+                  columns:         2;
+                  rows:            7;
+                  firstFrameIndex: 10;
+                  lastFrameIndex:  10;
+                  frameDuration:   0.5;
+                  loop:            true;
+                `);
+                slPeepEl.setAttribute('mood', 'escaping');
+                
+                if (clPeepEl) clPeepEl.remove(); console.log("circle lover executed");
+                if (slPeepEl) slPeepEl.remove(); console.log("square lover executed");
+              }
+
             // DEFAULT
             // Phone on phone
             } else if (capturedPhones.length > 0) {
@@ -729,7 +793,7 @@
       schema: {
         target:      { type: 'selector' },
         speed:       { type: 'number', default: PEEP_DEFAULT_SPEED },
-        minDistance: { type: 'number', default: 0.6 },
+        minDistance: { type: 'number', default: 0.55 },
         tolerance:   { type: 'number', default: 0.3 }
       },
 
