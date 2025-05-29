@@ -999,6 +999,7 @@
           // Stop crazy movement, play scream animation
           this.el.removeAttribute('peep-mover');
           this.el.removeAttribute('peep-flipper');
+          const previousMood = this.el.getAttribute('mood');
 
           // Flip the screamer towards the screamedAt
           this.flipPeepToward(this.el, targetPeep);
@@ -1045,7 +1046,7 @@
 
           // After 3s, reset target peep to neutral mood/face and restore mover
           setTimeout(() => {
-            targetPeep.setAttribute('mood', 'neutral');
+            targetPeep.setAttribute('mood', `${previousMood}`);
             this.replaceFace(targetPeep, 0);
             targetPeep.setAttribute('peep-mover', '');
             targetPeep.setAttribute('peep-flipper', '');
