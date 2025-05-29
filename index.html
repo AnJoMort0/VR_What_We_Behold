@@ -14,7 +14,7 @@
       const AUTO_DISMISS_TIME   = 15000;//ms
 
       const bodyHeight = 1.6; // universal world unit tall
-      const bodyWidth  = (120 / 180) * bodyHeight; // the spritesheet is 120/140 but 180 makes them a little taller and more good looking in VR
+      const bodyWidth  = (120 / 140) * bodyHeight;
 
       let Act   = 1;
       let Stage = "Stage_Start";
@@ -207,11 +207,7 @@
             peepEl.setAttribute('id', `lover-${type}-${idSuffix}`);
             peepEl.setAttribute('data-peep-type', `lover_${type}`);
             peepEl.setAttribute('mood', 'inLove');
-            // position: behind + a small left/right offset
-            peepEl.setAttribute(
-              'position',
-              `${basePos.x + xOffset} ${bodyHeight/2} ${basePos.z}`
-            );
+            peepEl.setAttribute('position',`${basePos.x + xOffset} ${bodyHeight/2} ${basePos.z}`);
             // body
             const body = document.createElement('a-image');
             body.setAttribute('src',   '#bodySheet');
@@ -252,12 +248,12 @@
             face.setAttribute('spritesheet-animation', {
               columns:          2,
               rows:             7,
-              firstFrameIndex:  8,
+              firstFrameIndex:  8, // kawai face
               lastFrameIndex:   8,
               frameDuration:    0.5,
               loop:             false
             });
-            face.setAttribute('position', '0.03 0.06 0.01');
+            face.setAttribute('position', '0.03 -0.25 0.01');
             face.setAttribute('material', 'transparent:true;alphaTest:0.01');
             peepEl.appendChild(face);
 
@@ -301,19 +297,19 @@
           cam.getWorldDirection(camDir);
 
           // 3 units behind camera
-          const spawnPos = camPos.clone().add(camDir.multiplyScalar(-3));
+          const basePos = camPos.clone().add(camDir.multiplyScalar(-3));
 
-          const crazy = document.createElement('a-image');
-          crazy.setAttribute('id', 'crazy-0');
-          crazy.setAttribute('data-peep-type', 'crazy');
-          crazy.setAttribute('src', '#crazySheet');
+          const crazyEl = document.createElement('a-entity');
+          crazyEl.setAttribute('id', 'crazy-0');
+          crazyEl.setAttribute('data-peep-type', 'crazy');
+          crazyEl.setAttribute('mood', 'crazy');
+          crazyEl.setAttribute('position', `${basePos.x} ${bodyHeight/2} ${basePos.z}`);
 
-          // scale so its 140px→1.6 world-units tall
-          crazy.setAttribute('height',   bodyHeight);
-          crazy.setAttribute('width',    (150/140) * bodyHeight);
-
-          // wander animation: frames 0–9
-          crazy.setAttribute('spritesheet-animation', {
+          const crazyBody = document.createElement('a-image');
+          crazyBody.setAttribute('src', '#crazySheet');
+          crazyBody.setAttribute('width', bodyWidth + 0.2);
+          crazyBody.setAttribute('height', bodyHeight);
+          crazyBody.setAttribute('spritesheet-animation', {
             columns:          3,
             rows:             7,
             firstFrameIndex:  0,
@@ -321,18 +317,16 @@
             frameDuration:    0.1,
             loop:             true
           });
+          crazyBody.setAttribute('material', 'transparent:true;alphaTest:0.01');
+          crazyEl.appendChild(crazyBody);
 
-          crazy.setAttribute('position', `${spawnPos.x} ${bodyHeight/2} ${spawnPos.z}`);
+          crazyEl.setAttribute('billboard',      '');
+          crazyEl.setAttribute('peep-mover',     '');
+          crazyEl.setAttribute('peep-flipper',   '');
+          crazyEl.setAttribute('no-frustum-cull','');
+          crazyEl.setAttribute('crazy-behavior', '');
 
-          // same behaviors as others
-          crazy.setAttribute('billboard',      '');
-          crazy.setAttribute('peep-mover',     '');
-          crazy.setAttribute('peep-flipper',   '');
-          crazy.setAttribute('no-frustum-cull','');
-          crazy.setAttribute('material', 'transparent:true;alphaTest:0.01');
-          crazy.setAttribute('crazy-behavior', '');
-
-          sceneEl.appendChild(crazy);
+          sceneEl.appendChild(crazyEl);
           console.log('crazy spawned');
         },
       });
@@ -591,11 +585,11 @@
                   // Hat sprite
                   const hat = document.createElement('a-image');
                   hat.setAttribute('src',    '#hatSheet');
-                  hat.setAttribute('width',   bodyWidth * 0.75);
-                  hat.setAttribute('position', `0.13 0.64 0.01`);
+                  hat.setAttribute('width',   bodyWidth * 0.8);
+                  hat.setAttribute('position', `0 0.185 0.01`);
                   hat.setAttribute('spritesheet-animation', {
                     columns:          4,
-                    rows:             8,
+                    rows:             7,
                     firstFrameIndex:  0,
                     lastFrameIndex:   14,
                     frameDuration:    0.1,
@@ -613,7 +607,7 @@
                   face.setAttribute('src',   '#faceSheet');
                   face.setAttribute('width',  bodyWidth);
                   face.setAttribute('height', bodyHeight);
-                  face.setAttribute('position', `0.04 0.18 0.01`);
+                  face.setAttribute('position', `0.04 -0.15 0.01`);
                   face.setAttribute('spritesheet-animation', {
                     columns:         2,
                     rows:            7,
@@ -669,12 +663,11 @@
                   updateCaption('getARoom', true);
                   this.el.sceneEl.emit('start-capture-animation');
 
-                  face.setAttribute('position', `0.07 0.08 0.01`);
-                  face.setAttribute('scale',    '0.8 0.8 1');
+                  face.setAttribute('position', `0.07 -0.25 0.01`);
                   face.setAttribute('spritesheet-animation', {
                     columns:          2,
                     rows:             7,
-                    firstFrameIndex:  9,
+                    firstFrameIndex:  9, // humiliated face
                     lastFrameIndex:   9,
                     frameDuration:    0.5,
                     loop:             true
@@ -738,8 +731,15 @@
                 const face    = peepEl.querySelector('a-image[src="#faceSheet"]');
                 const hat     = peepEl.querySelector('a-image[src="#hatSheet"]');
 
-                face.setAttribute('scale',    '0.75 0.75 1');
-                face.setAttribute('spritesheet-animation', {
+                // Couldn't just swap the face for some reason, so instead I just replace it to the "neutral" face
+                peepEl.removeChild(face);
+                const embarassedFace = document.createElement('a-image');
+                embarassedFace.setAttribute('src',   '#faceSheet');
+                embarassedFace.setAttribute('width',  bodyWidth);
+                embarassedFace.setAttribute('height', bodyHeight);
+                embarassedFace.setAttribute('scale',    '0.8 0.8 1');
+                embarassedFace.setAttribute('position', `0.04 -0.2 0.01`)
+                embarassedFace.setAttribute('spritesheet-animation', {
                   columns:          2,
                   rows:             7,
                   firstFrameIndex:  7,  // embarassed face
@@ -747,12 +747,15 @@
                   frameDuration:    0.5,
                   loop:             true
                 });
+                // Prevents png invisible parts collision
+                embarassedFace.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+                peepEl.appendChild(embarassedFace);
 
                 setTimeout(() => {
                   hat.setAttribute('spritesheet-animation', {
                     columns:          4,
-                    rows:             8,
-                    firstFrameIndex:  14, // take out the hat --> a little cropping problem to solve in the future
+                    rows:             7,
+                    firstFrameIndex:  14,
                     lastFrameIndex:   25,
                     frameDuration:    0.1,
                     loop:             false
@@ -761,16 +764,16 @@
 
                 setTimeout(() => {
                   // Couldn't just swap the face for some reason, so instead I just replace it to the "neutral" face
-                  peepEl.removeChild(face);
+                  peepEl.removeChild(embarassedFace);
                   const newFace = document.createElement('a-image');
                   newFace.setAttribute('src',   '#faceSheet');
                   newFace.setAttribute('width',  bodyWidth);
                   newFace.setAttribute('height', bodyHeight);
-                  newFace.setAttribute('position', `0.04 ${bodyHeight * 0.25} 0.01`);
+                  newFace.setAttribute('position', `0.04 0 0.01`);
                   newFace.setAttribute('spritesheet-animation', {
                     columns:          2,
                     rows:             7,
-                    firstFrameIndex:  0,
+                    firstFrameIndex:  0, // neutral face
                     lastFrameIndex:   0,
                     frameDuration:    3,
                     loop:             true
@@ -880,10 +883,11 @@
           this.direction = Math.random() * 2 * Math.PI;
         },
         tick: function (time, delta) {
+          if (!this.data) return; // safeguard when the screamed at and screamer peeps get removed and put back the peep mover
           const pos     = this.el.object3D.position;
           const prevPos = pos.clone(); // this is needed to make sure peeps face the correct direction
           // Move in direction, scaled by delta
-          const moveAmt = this.data.speed * (delta / 16);
+          const moveAmt = this.data.speed * (delta / 16); // BUG: This sometimes breaks here when used for the screamer peep, need to check what to do here
           const dx      = Math.cos(this.direction) * moveAmt;
           const dz      = Math.sin(this.direction) * moveAmt;
           pos.x += dx;
@@ -947,8 +951,8 @@
        */
       AFRAME.registerComponent('crazy-behavior', {
         schema: {
-          screamRange:      { type: 'number', default: 1 },
-          screamCooldown:   { type: 'number', default: 3000 }, // ms
+          screamRange:      { type: 'number', default: 2 },
+          screamCooldown:   { type: 'number', default: 3000 },
           screamAnimStart:  { type: 'number', default: 10 },
           screamAnimEnd:    { type: 'number', default: 20 },
           frameDuration:    { type: 'number', default: 0.08 }
@@ -958,16 +962,16 @@
           this.screaming = false;
           this.screamTimeout = null;
           this.screamedAt = null;
-          this.bodyWidth = (120 / 180) * 1.6; // match your main body width logic
+          this.bodyWidth = (120 / 180) * 1.6;
           this.bodyHeight = 1.6;
         },
         tick: function () {
           if (this.cooldown || this.screaming) return;
 
           // Check for the closest peep that isn't itself or already spooked
-          const myPos = this.el.object3D.position;
+          const myPos   = this.el.object3D.position;
           const sceneEl = this.el.sceneEl;
-          const peeps = Array.from(sceneEl.querySelectorAll('[data-peep-type]'))
+          const peeps   = Array.from(sceneEl.querySelectorAll('[data-peep-type]'))
             .filter(el =>
               el !== this.el &&
               el.getAttribute('mood') !== 'spooked' &&
@@ -976,10 +980,10 @@
 
           let closest = null, closestDist = Infinity;
           peeps.forEach(peep => {
-            const pos = peep.object3D.position;
-            const dist = myPos.distanceTo(pos);
+            const pos   = peep.object3D.position;
+            const dist  = myPos.distanceTo(pos);
             if (dist < this.data.screamRange && dist < closestDist) {
-              closest = peep;
+              closest     = peep;
               closestDist = dist;
             }
           });
@@ -990,42 +994,49 @@
           this.screaming = true;
           this.screamedAt = targetPeep;
           const frameCount = this.data.screamAnimEnd - this.data.screamAnimStart + 1;
-          const animDuration = frameCount * this.data.frameDuration * 1500; // ms
+          const animDuration = frameCount * this.data.frameDuration * 1000; // ms
 
           // Stop crazy movement, play scream animation
           this.el.removeAttribute('peep-mover');
-          this.el.setAttribute('spritesheet-animation', {
-            columns: 3,
-            rows: 7,
-            firstFrameIndex: this.data.screamAnimStart,
-            lastFrameIndex:  this.data.screamAnimEnd,
-            frameDuration: this.data.frameDuration,
-            loop: false
+          this.el.removeAttribute('peep-flipper');
+
+          // Flip the screamer towards the screamedAt
+          this.flipPeepToward(this.el, targetPeep);
+
+          const crazyImg = this.el.querySelector('a-image');
+          crazyImg.setAttribute('spritesheet-animation', {
+            columns:          3,
+            rows:             7,
+            firstFrameIndex:  this.data.screamAnimStart,
+            lastFrameIndex:   this.data.screamAnimEnd,
+            frameDuration:    this.data.frameDuration,
+            loop:             false
           });
 
           // Spook the target peep
           targetPeep.setAttribute('mood', 'spooked');
           targetPeep.removeAttribute('peep-mover');
+          targetPeep.removeAttribute('peep-flipper');
           // Flip target to look at crazy
-          this.flipPeepToward(targetPeep, this.el.object3D.position);
+          this.flipPeepToward(targetPeep, this.el);
 
-          // Replace face with spooked face
-          this.replaceFace(targetPeep, 3);
-
-          // "Jump back" a bit
-          // need to add animation here, wasn't working
+          // Replace face with spooked face, after a slight delay for dramatic effect
+          setTimeout(() => {
+            this.replaceFace(targetPeep, 3);
+          }, animDuration * 0.33);
 
           // After animDuration (frames 10–20), crazy resumes walking (but stays in cooldown)
           setTimeout(() => {
-            this.el.setAttribute('spritesheet-animation', {
-              columns: 3,
-              rows: 7,
-              firstFrameIndex: 0,
-              lastFrameIndex: 9,
-              frameDuration: this.data.frameDuration,
-              loop: true
+            crazyImg.setAttribute('spritesheet-animation', {
+              columns:          3,
+              rows:             7,
+              firstFrameIndex:  0,
+              lastFrameIndex:   9,
+              frameDuration:    this.data.frameDuration,
+              loop:             true
             });
             this.el.setAttribute('peep-mover', '');
+            this.el.setAttribute('peep-flipper', '');
             this.screaming = false;
             // Start cooldown (can't scream at new peep for a while)
             this.cooldown = true;
@@ -1037,6 +1048,7 @@
             targetPeep.setAttribute('mood', 'neutral');
             this.replaceFace(targetPeep, 0);
             targetPeep.setAttribute('peep-mover', '');
+            targetPeep.setAttribute('peep-flipper', '');
           }, 3000);
         },
         // Always swap face for new one
@@ -1052,13 +1064,13 @@
           newFace.setAttribute('src', '#faceSheet');
           newFace.setAttribute('width', bodyWidth);
           newFace.setAttribute('height', bodyHeight);
-          newFace.setAttribute('position', `0.04 ${bodyHeight * 0.25} 0.01`);
+          newFace.setAttribute('position', `0.04 0 0.01`);
           newFace.setAttribute('spritesheet-animation', {
-            columns: 2,
-            rows: 7,
-            firstFrameIndex: frameIndex,
-            lastFrameIndex: frameIndex,
-            frameDuration: 3,
+            columns:          2,
+            rows:             7,
+            firstFrameIndex:  frameIndex,
+            lastFrameIndex:   frameIndex,
+            frameDuration:    3,
             loop: true
           });
           newFace.setAttribute('material', 'transparent: true; alphaTest: 0.01');
@@ -1067,7 +1079,7 @@
         flipPeepToward: function (peep, targetPos) {
           const myPos = peep.object3D.position;
           const flip = (targetPos.x > myPos.x) ? 1 : -1;
-          peep.setAttribute('scale', `${flip} 1 1`);
+            peep.setAttribute('scale', `${flip} 1 1`);
         },
         remove: function () {
           clearTimeout(this.screamTimeout);
@@ -1154,13 +1166,13 @@
       });
 
       /**
-       * CAPTURE-ANIMATION Component
+       * CAPTURE-ANIMATION COMPONENT
        * Stops the peeps from moving and make them look at their phone
        */
        AFRAME.registerComponent('capture-animation', {
         schema: {
           lookOffset:   { type: 'vec2',   default: { x: 0.04, y: -0.05 } },
-          phoneSize:    { type: 'number', default: 0.2 },
+          phoneSize:    { type: 'number', default: 0.3 },
           lookDuration: { type: 'number', default: 700 } // ms
         },
 
@@ -1214,16 +1226,17 @@
             phone.setAttribute('width',  phoneSize);
             phone.setAttribute('height', phoneSize);
             // start behind them
-            phone.setAttribute('position', '0 0.15 -0.001');
+            phone.setAttribute('position', '0 -0.5 -0.001');
             phone.classList.add('capture-phone');
             // animate up into view
             phone.setAttribute('animation__phonein', `
               property: position;
-              to:       0.25 0.1 0.001;
+              to:       0.42 -0.3 0.1;
               dur:      ${lookDuration};
               easing:   easeOutQuad;
               loop:     false
             `);
+            phone.setAttribute('material', 'transparent: true; alphaTest: 0.01');
             peepEl.appendChild(phone);
 
             // 3) Make the face look down
@@ -1267,7 +1280,7 @@
               phone.removeAttribute('animation__phonein');
               phone.setAttribute('animation__phoneout', `
                 property: position;
-                to:       0 0.15 -0.001;
+                to:       0 -0.5 -0.001;
                 dur:      ${lookDuration};
                 easing:   easeInQuad;
                 loop:     false
@@ -1380,11 +1393,11 @@
             face.setAttribute('src',   '#faceSheet');
             face.setAttribute('width',  bodyWidth);
             face.setAttribute('height', bodyHeight);
-            face.setAttribute('position', `0.04 ${bodyHeight * 0.25} 0.01`);
+            face.setAttribute('position', `0.04 0 0.01`);
             face.setAttribute('spritesheet-animation', {
               columns:          2,
               rows:             7,
-              firstFrameIndex:  0,
+              firstFrameIndex:  0, // neutral face
               lastFrameIndex:   0,
               frameDuration:    0.5,
               loop:             true
