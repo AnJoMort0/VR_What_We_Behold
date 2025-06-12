@@ -145,6 +145,7 @@
           sceneEl.addEventListener('spawn-crazy'  , () => this.spawnCrazy());
 
           if (Act == 1 && Stage == "Stage_Start") {
+            spawnNeutralPeeps(PEEP_SPAWN_COUNT);
             // after 5s, spawn the Hat Guy
             setTimeout(() => {
               Stage = "Stage_Hat";
@@ -542,9 +543,18 @@
               console.warn('photoPlane mesh not ready');
             }
 
-            ////////////////////////////////////////////////////////
-            // ------------------  GAME LOGIC  ------------------ //
-            ////////////////////////////////////////////////////////
+          ////////////////////////////////////////////////////////////////////////////////
+          ////////////////////////////////////////////////////////////////////////////////
+          ////////////////////////////////////////////////////////////////////////////////
+          ////░██████╗░░█████╗░███╗░░░███╗███████╗//██╗░░░░░░█████╗░░██████╗░██╗░█████╗░//
+          ////██╔════╝░██╔══██╗████╗░████║██╔════╝//██║░░░░░██╔══██╗██╔════╝░██║██╔══██╗//
+          ////██║░░██╗░███████║██╔████╔██║█████╗░░//██║░░░░░██║░░██║██║░░██╗░██║██║░░╚═╝//
+          ////██║░░╚██╗██╔══██║██║╚██╔╝██║██╔══╝░░//██║░░░░░██║░░██║██║░░╚██╗██║██║░░██╗//
+          ////╚██████╔╝██║░░██║██║░╚═╝░██║███████╗//███████╗╚█████╔╝╚██████╔╝██║╚█████╔╝//
+          ////░╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝╚══════╝//╚══════╝░╚════╝░░╚═════╝░╚═╝░╚════╝░//
+          ////////////////////////////////////////////////////////////////////////////////
+          ////////////////////////////////////////////////////////////////////////////////
+          ////////////////////////////////////////////////////////////////////////////////
 
             // NOTHING
             if (captured.length === 0 && capturedPhones.length === 0) {
@@ -689,7 +699,7 @@
                   peepEl.setAttribute('animation__runoff', {
                     property: 'position',
                     to:       `${exitX} ${exitY} ${exitZ}`,
-                    dur:      15000,
+                    dur:      10000,
                     easing:   'linear',
                   });
 
@@ -701,6 +711,7 @@
                   if (Stage == 'Stage_Lovers') {
                     Act     = 2;
                     Stage   = 'Stage_Screamer'
+                    spawnNeutralPeeps(4);
                     this.el.sceneEl.emit('spawn-crazy');
                   }
 
@@ -1336,108 +1347,118 @@
         });
 
       /**
-       * PEEP-MANAGER COMPONENT
-       * Spawns a number of peeps, with tags, id and data-peep-type, and attaches mover + billboard + no-frustum-cull.
+       * Spawns a number of neutral peeps (half circles, half squares) in random positions.
+       * Replaces the previous 'peep-manager' A-Frame component.
+       * Use: spawnNeutralPeeps(count, [radius], [parentEl])
+       *  - count: Number of peeps to spawn.
+       *  - radius (optional)
+       *  - parentEl (optional): Parent element to append to (default '#peeps').
+       * 
        * chatGPT assisted
        */
-       AFRAME.registerComponent('peep-manager', {
-        schema: {
-          count:       { type: 'int',    default: PEEP_SPAWN_COUNT },
-          radius:      { type: 'number', default: PEEP_SPAWN_RADIUS },
-        },
+      function spawnNeutralPeeps(count, radius = PEEP_SPAWN_RADIUS, parentEl = null) {
+        // Use #peeps entity as default parent if not provided
+        if (!parentEl) parentEl = document.querySelector('#peeps');
+        
+        const half = count / 2;
 
-        init: function () {
-          const half = this.data.count / 2;
+        for (let i = 0; i < count; i++) {
+          let type;
+          if (i < half) {
+            type = 'circle';
+          } else {
+            type = 'square';
+          }
 
-          for (let i = 0; i < this.data.count; i++) {
-            let type;
-            if (i < half) {
-              type = 'circle';
-            } else {
-              type = 'square';
-            }
-            const id = `${type}-${i}`;
-            const initialMood = "neutral";
+          function getNextPeepIndex(type) {
+            // Finds all peeps with data-peep-type=type and returns the next index
+            const all = document.querySelectorAll(`[data-peep-type="${type}"]`);
+            return all.length;
+          }
 
-            // Parent container for body + face
-            const peepEl = document.createElement('a-entity');
-            peepEl.setAttribute('id', id);
-            peepEl.setAttribute('data-peep-type', type);
-            peepEl.setAttribute('mood', initialMood);
+          const index = getNextPeepIndex(type);
+          const id = `${type}-${index}`;
+          const initialMood = "neutral";
 
-            // Random XZ within radius, Y = 1
-            const angle = Math.random() * 2 * Math.PI;
-            const dist  = Math.random() * this.data.radius;
-            const x     = dist * Math.cos(angle);
-            const z     = dist * Math.sin(angle);
-            peepEl.setAttribute('position', `${x} ${bodyHeight/2} ${z}`);
+          // Parent container for body + face
+          const peepEl = document.createElement('a-entity');
+          peepEl.setAttribute('id', id);
+          peepEl.setAttribute('data-peep-type', type);
+          peepEl.setAttribute('mood', initialMood);
 
-            // BODY sprite
-            const body = document.createElement('a-image');
-            body.setAttribute('src', '#bodySheet');
-            body.setAttribute('width',  bodyWidth);
-            body.setAttribute('height', bodyHeight);
-            body.setAttribute('spritesheet-animation', {
-              columns:          2,
-              rows:             1,
-              firstFrameIndex:  type === 'circle' ? 0 : 1,
-              lastFrameIndex:   type === 'circle' ? 0 : 1,
-              frameDuration:    1,
-              loop:             false
-            });
-            // Prevents png invisible parts collision
-            body.setAttribute('material', 'transparent: true; alphaTest: 0.01');
-            peepEl.appendChild(body);
+          // Random XZ within radius, Y = 0.8 (mid-body)
+          const angle = Math.random() * 2 * Math.PI;
+          const dist  = Math.random() * radius;
+          const x     = dist * Math.cos(angle);
+          const z     = dist * Math.sin(angle);
+          peepEl.setAttribute('position', `${x} ${bodyHeight/2} ${z}`);
 
-            // FACE sprite, neutral only
-            const face = document.createElement('a-image');
-            face.setAttribute('src',   '#faceSheet');
-            face.setAttribute('width',  bodyWidth);
-            face.setAttribute('height', bodyHeight);
-            face.setAttribute('position', `0.04 0 0.01`);
-            face.setAttribute('spritesheet-animation', {
-              columns:          2,
-              rows:             7,
-              firstFrameIndex:  0, // neutral face
-              lastFrameIndex:   0,
-              frameDuration:    0.5,
-              loop:             true
-            });
-            // Prevents png invisible parts collision
-            face.setAttribute('material', 'transparent: true; alphaTest: 0.01');
-            peepEl.appendChild(face);
+          // BODY sprite
+          const body = document.createElement('a-image');
+          body.setAttribute('src', '#bodySheet');
+          body.setAttribute('width',  bodyWidth);
+          body.setAttribute('height', bodyHeight);
+          body.setAttribute('spritesheet-animation', {
+            columns:          2,
+            rows:             1,
+            firstFrameIndex:  type === 'circle' ? 0 : 1,
+            lastFrameIndex:   type === 'circle' ? 0 : 1,
+            frameDuration:    1,
+            loop:             false
+          });
+          // Prevents png invisible parts collision
+          body.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+          peepEl.appendChild(body);
 
-            // Prevents png invisible parts collision
-            peepEl.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+          // FACE sprite, neutral only
+          const face = document.createElement('a-image');
+          face.setAttribute('src',   '#faceSheet');
+          face.setAttribute('width',  bodyWidth);
+          face.setAttribute('height', bodyHeight);
+          face.setAttribute('position', `0.04 0 0.01`);
+          face.setAttribute('spritesheet-animation', {
+            columns:          2,
+            rows:             7,
+            firstFrameIndex:  0, // neutral face
+            lastFrameIndex:   0,
+            frameDuration:    0.5,
+            loop:             true
+          });
+          // Prevents png invisible parts collision
+          face.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+          peepEl.appendChild(face);
 
-            // Common behavior
-            peepEl.setAttribute('billboard', '');
-            peepEl.setAttribute(
-              'peep-mover',
-              `speed: ${0.01 + Math.random() * 0.01}; radius: ${this.data.radius}`
-            );
-            peepEl.setAttribute('peep-flipper', '');
-            peepEl.setAttribute('no-frustum-cull', '');
+          // Prevents png invisible parts collision
+          peepEl.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+
+          // Common behavior
+          peepEl.setAttribute('billboard', '');
+          peepEl.setAttribute(
+            'peep-mover',
+            `speed: ${0.01 + Math.random() * 0.01}; radius: ${radius}`
+          );
+          peepEl.setAttribute('peep-flipper', '');
+          peepEl.setAttribute('no-frustum-cull', '');
 
             // --- DEBUG: Floating ID label over each peep - chatGPT generated ---
-            const labelEl = document.createElement('a-entity');
-            labelEl.classList.add('debug-label');
-            labelEl.setAttribute('text', `
-              value: ${id};
-              align: center;
-              width: 2;
-              color: #000
-            `);
-            labelEl.setAttribute('position', '0 0.6 0');
-            labelEl.setAttribute('billboard', '');
-            labelEl.setAttribute('visible', false);
-            peepEl.appendChild(labelEl);
-            // ----------------------------------------------
+          const labelEl = document.createElement('a-entity');
+          labelEl.classList.add('debug-label');
+          labelEl.setAttribute('text', `
+            value: ${id};
+            align: center;
+            width: 2;
+            color: #000
+          `);
+          labelEl.setAttribute('position', '0 0.6 0');
+          labelEl.setAttribute('billboard', '');
+          labelEl.setAttribute('visible', false);
+          peepEl.appendChild(labelEl);
+          // ----------------------------------------------
 
-            this.el.appendChild(peepEl);
-          }
+          parentEl.appendChild(peepEl);
+          console.log("spawned " + count + " peeps!");
         }
-      });
+      }
 
     </script>
   </head>
@@ -1586,7 +1607,6 @@
       <!-- Peep spawner -->
       <a-entity
         id        = "peeps"
-        peep-manager
       ></a-entity>
     </a-scene>
   </body>
