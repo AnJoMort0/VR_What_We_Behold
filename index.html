@@ -552,7 +552,7 @@
           ////██║░░╚██╗██╔══██║██║╚██╔╝██║██╔══╝░░//██║░░░░░██║░░██║██║░░╚██╗██║██║░░██╗//
           ////╚██████╔╝██║░░██║██║░╚═╝░██║███████╗//███████╗╚█████╔╝╚██████╔╝██║╚█████╔╝//
           ////░╚═════╝░╚═╝░░╚═╝╚═╝░░░░░╚═╝╚══════╝//╚══════╝░╚════╝░░╚═════╝░╚═╝░╚════╝░//
-          ////////////////////////////////////////////////////////////////////////////////
+          //////////////////////////////////GAME LOGIC////////////////////////////////////
           ////////////////////////////////////////////////////////////////////////////////
           ////////////////////////////////////////////////////////////////////////////////
 
@@ -642,12 +642,18 @@
                 const crazyEl       = capturedCrazy.el;
 
                 if (captured.some(p => p.mood === 'spooked')) {
-                  updateCaption('crazySquareAttacks', true);
-                  this.el.sceneEl.emit('start-capture-animation');
-
-                  if (crazyEl.parentNode) crazyEl.parentNode.removeChild(crazyEl); console.log(crazyEl.id + " executed");
-
-                  Stage = "Stage_Nervous";
+                  if (crazyEl.getAttribute('mood') === 'screaming') {
+                    updateCaption('crazySquareAttacks', true);
+                    this.el.sceneEl.emit('start-capture-animation');
+  
+                    if (crazyEl.parentNode) crazyEl.parentNode.removeChild(crazyEl); console.log(crazyEl.id + " executed");
+  
+                    spawnNeutralPeeps(2);
+                    Stage = "Stage_Nervous";
+                  } else {
+                    updateCaption('justMissed');
+                    this.el.sceneEl.emit('start-capture-animation');
+                  }
                   
                 } else {
                   updateCaption('somethingInteresting');
@@ -1012,7 +1018,7 @@
           this.el.removeAttribute('peep-flipper');
           const previousMood = this.el.getAttribute('mood');
 
-          // Flip the screamer towards the screamedAt
+          // Flip the screamer towards the screamedAt -- BUG this is not working
           this.flipPeepToward(this.el, targetPeep);
 
           const crazyImg = this.el.querySelector('a-image');
@@ -1024,12 +1030,13 @@
             frameDuration:    this.data.frameDuration,
             loop:             false
           });
+          this.el.setAttribute('mood', 'screaming');
 
           // Spook the target peep
           targetPeep.setAttribute('mood', 'spooked');
           targetPeep.removeAttribute('peep-mover');
           targetPeep.removeAttribute('peep-flipper');
-          // Flip target to look at crazy
+          // Flip target to look at crazy -- BUG this is not working
           this.flipPeepToward(targetPeep, this.el);
 
           // Replace face with spooked face, after a slight delay for dramatic effect
@@ -1050,6 +1057,7 @@
             this.el.setAttribute('peep-mover', '');
             this.el.setAttribute('peep-flipper', '');
             this.screaming = false;
+            this.el.setAttribute('mood', `${previousMood}`);
             // Start cooldown (can't scream at new peep for a while)
             this.cooldown = true;
             setTimeout(() => { this.cooldown = false; }, this.data.screamCooldown);
@@ -1057,7 +1065,7 @@
 
           // After 3s, reset target peep to neutral mood/face and restore mover
           setTimeout(() => {
-            targetPeep.setAttribute('mood', `${previousMood}`);
+            targetPeep.setAttribute('mood', `neutral`);
             this.replaceFace(targetPeep, 0);
             targetPeep.setAttribute('peep-mover', '');
             targetPeep.setAttribute('peep-flipper', '');
