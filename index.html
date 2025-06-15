@@ -6,12 +6,23 @@
 
     <script>
       // GENERAL VALUES
-      const PEEP_SPAWN_COUNT    = 12;
-      const PEEP_SPAWN_RADIUS   = 8;
-      const PEEP_DEFAULT_SPEED  = 0.015;
-      const DISMISS_TIME        = 5000; //ms
-      let   dismissTime         = DISMISS_TIME;
-      const AUTO_DISMISS_TIME   = 15000;//ms
+      const PEEP_SPAWN_COUNT      = 12;
+      const PEEP_SPAWN_RADIUS     = 8;
+      const PEEP_DEFAULT_SPEED    = 0.015;
+      const HATGUY_DEFAULT_SPEED  = PEEP_DEFAULT_SPEED * 0.8;
+      const CRAZY_DEFAULT_SPEED   = PEEP_DEFAULT_SPEED * 1.5;
+      const NERVOUS_DEFAULT_SPEED = PEEP_DEFAULT_SPEED * 0.7;
+      const DISMISS_TIME          = 5000; //ms
+      let   dismissTime           = DISMISS_TIME;
+      const AUTO_DISMISS_TIME     = 15000;//ms
+
+      function getDefaultPeepSpeed(peepEl) {
+        const type = peepEl.getAttribute('data-peep-type');
+        if (type === 'hat_guy')   return HATGUY_DEFAULT_SPEED;
+        if (type === 'crazy')     return CRAZY_DEFAULT_SPEED;
+        if (type === 'nervous')   return NERVOUS_DEFULT_SPEED;
+        return PEEP_DEFAULT_SPEED;
+      }
 
       const bodyHeight = 1.6; // universal world unit tall
       const bodyWidth  = (120 / 140) * bodyHeight;
@@ -30,12 +41,13 @@
        */
       AFRAME.registerComponent('spritesheet-animation', {
         schema: {
-          rows:            { type: 'number', default: 1 },
-          columns:         { type: 'number', default: 1 },
-          firstFrameIndex: { type: 'number', default: 0 },
-          lastFrameIndex:  { type: 'number', default: -1 },
-          frameDuration:   { type: 'number', default: 0.1 }, // seconds
-          loop:            { type: 'boolean', default: true }
+          rows:               { type: 'number',   default: 1 },
+          columns:            { type: 'number',   default: 1 },
+          firstFrameIndex:    { type: 'number',   default: 0 },
+          lastFrameIndex:     { type: 'number',   default: -1 },
+          frameDuration:      { type: 'number',   default: 0.1 }, // seconds
+          loop:               { type: 'boolean',  default: true },
+          customNervousLoop:  { type: 'boolean',  default: false },
         },
 
         init: function () {
@@ -73,9 +85,67 @@
           const offsetY = (d.rows - row - 1) / d.rows;
 
           if (this.mesh.material.map) {
-          this.mesh.material.map.repeat.set(this.repeatX, this.repeatY);
-          this.mesh.material.map.offset.set(offsetX, offsetY);
-        }
+            this.mesh.material.map.repeat.set(this.repeatX, this.repeatY);
+            this.mesh.material.map.offset.set(offsetX, offsetY);
+          }
+        },
+
+        tick: function (time, dt) { // --> this was fully chatGPT generated (human revised), basically translated Nicky Cage's original spritesheet loop into this custom component, because I couldn't figure it out
+          const d = this.data;
+          if (!this.mesh || (!d.loop && this.currentFrameIndex > d.lastFrameIndex)) return;
+
+          if (d.customNervousLoop) {
+            // Custom shifty logic
+            this.frameTimer += dt / 1000;
+            if (this.frameTimer > d.frameDuration) {
+              let frame = this.currentFrameIndex;
+              let nextFrame = frame;
+
+              if (frame == 6) {
+                if (Math.random() < 0.05) nextFrame = frame + 1;
+              } else if (frame < 10) {
+                nextFrame = frame + 1;
+              } else if (frame == 10) {
+                if (Math.random() < 0.05) nextFrame = frame + 1;
+              } else if (frame < 16) {
+                nextFrame = frame + 1;
+              } else if (frame == 16) {
+                nextFrame = 6;
+              }
+              // Only update if frame changed
+              if (nextFrame !== frame) {
+                this.currentFrameIndex = nextFrame;
+                this.frameTimer = 0;
+              } else {
+                // Wait another frame duration
+                this.frameTimer -= d.frameDuration;
+              }
+            }
+          } else {
+            // Classic loop
+            this.frameTimer += dt / 1000;
+            while (this.frameTimer > d.frameDuration) {
+              this.currentFrameIndex++;
+              this.frameTimer -= d.frameDuration;
+              if (this.currentFrameIndex > d.lastFrameIndex) {
+                if (d.loop) {
+                  this.currentFrameIndex = d.firstFrameIndex;
+                } else {
+                  return;
+                }
+              }
+            }
+          }
+
+          // Update texture as usual
+          const col = this.currentFrameIndex % d.columns;
+          const row = Math.floor(this.currentFrameIndex / d.columns);
+          const offsetX = col / d.columns;
+          const offsetY = (d.rows - row - 1) / d.rows;
+          if (this.mesh.material.map) {
+            this.mesh.material.map.repeat.set(this.repeatX, this.repeatY);
+            this.mesh.material.map.offset.set(offsetX, offsetY);
+          }
         }
       });
 
@@ -178,7 +248,7 @@
 
               // standard behaviors
               hatGuy.setAttribute('billboard', '');
-              hatGuy.setAttribute('peep-mover', `speed : 0.01; radius : 8`);
+              hatGuy.setAttribute('peep-mover', `speed : ${HATGUY_DEFAULT_SPEED}`);
               hatGuy.setAttribute('peep-flipper', '');
               hatGuy.setAttribute('no-frustum-cull', '');
               hatGuy.setAttribute('material', 'transparent: true; alphaTest: 0.01');
@@ -322,7 +392,7 @@
           crazyEl.appendChild(crazyBody);
 
           crazyEl.setAttribute('billboard',      '');
-          crazyEl.setAttribute('peep-mover',     '');
+          crazyEl.setAttribute('peep-mover',     `speed : ${CRAZY_DEFAULT_SPEED}`);
           crazyEl.setAttribute('peep-flipper',   '');
           crazyEl.setAttribute('no-frustum-cull','');
           crazyEl.setAttribute('crazy-behavior', '');
@@ -469,6 +539,7 @@
                   id:       peepEl.id,
                   type:     peepEl.dataset.peepType,
                   mood:     peepEl.getAttribute('mood'),
+                  accessory:peepEl.getAttribute('accessory'),
                   distance: worldPos.distanceTo(camPos),
                   xPosition: x,
                 });
@@ -556,13 +627,20 @@
           ////////////////////////////////////////////////////////////////////////////////
           ////////////////////////////////////////////////////////////////////////////////
 
-            // NOTHING
+            /**
+             * ///////////////
+             * NOTHING
+             * //////////////
+            */
             if (captured.length === 0 && capturedPhones.length === 0) {
               updateCaption('wowNothing');
               this.el.sceneEl.emit('start-capture-animation');
 
-            // ACT 1
-            // Hat Guy
+            /**
+             * ///////////////
+             * HAT GUY (ACT 1, Hat Stage)
+             * //////////////
+            */
             } else if (Act == 1 && Stage == "Stage_Hat" && captured.some(p => p.type === 'hat_guy')) {
               const capturedHatGuy = captured.find(p => p.type === 'hat_guy'); // find the correct peep
               // see if any other captured peep “blocks” it
@@ -608,8 +686,8 @@
                   hat.setAttribute('material', 'transparent:true;alphaTest:0.01');
                   peepEl.appendChild(hat);
 
-                  // Mood
-                  peepEl.setAttribute('mood', 'hatted');
+                  // Accessories
+                  peepEl.setAttribute('accessory', 'hat');
 
                   // Couldn't just swap the face for some reason, so instead I just replace it to the "proud" face (frame 6)
                   peepEl.removeChild(peepEl.querySelector('a-image[src="#faceSheet"]'));
@@ -635,7 +713,11 @@
                 this.el.sceneEl.emit('spawn-lovers');
               }
 
-            // Crazy screamer
+            /**
+             * ///////////////
+             * CRAZY SCREAMER (Act II, Screamer Stage)
+             * //////////////
+            */
             } else if (captured.some(p => p.type === 'crazy') || captured.some(p => p.mood === 'spooked')) {
               if (captured.some(p => p.type === 'crazy')) {
                 const capturedCrazy = captured.find(p => p.type === 'crazy'); // find the correct peep
@@ -647,6 +729,41 @@
                     this.el.sceneEl.emit('start-capture-animation');
   
                     if (crazyEl.parentNode) crazyEl.parentNode.removeChild(crazyEl); console.log(crazyEl.id + " executed");
+
+                    //Set the next Stage's main peep: Nervous
+                    // Pick one random circle-type peep
+                    let circles = Array.from(sceneEl.querySelectorAll('[data-peep-type]')).filter(el => el.dataset.peepType === 'circle' && el.getAttribute('mood') !== 'spooked');
+                    circles.sort(() => 0.5 - Math.random());
+                    const chosen = circles.slice(0, 1); // I'm keeping it an array if I want to ever change it to be multple nervous
+
+                    // For each, set mood, swap face
+                    chosen.forEach(peepEl => {
+                      // Mood
+                      peepEl.setAttribute('mood', 'nervous');
+
+                      peepEl.removeChild(peepEl.querySelector('a-image[src="#faceSheet"]'));
+                      const face = document.createElement('a-image');
+                      face.setAttribute('src',   '#nervousFaceSheet');
+                      face.setAttribute('width',  bodyWidth);
+                      face.setAttribute('height', bodyHeight);
+                      face.setAttribute('position', `0 -0.02 0.01`);
+                      // link: nervousFaceChange
+                      face.setAttribute('spritesheet-animation', {
+                        columns:         8,
+                        rows:            4,
+                        firstFrameIndex: 0,
+                        lastFrameIndex:  16,
+                        frameDuration:   0.1,
+                        loop:            false,
+                      });
+                      // Prevents png invisible parts collision
+                      face.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+                      peepEl.appendChild(face);
+
+                      setTimeout(() => {
+                        peepEl.setAttribute('nervous-behavior', '');
+                      }, (16 - 3) * 0.1 * 1000); // link: nervousFaceChange
+                    });
   
                     spawnNeutralPeeps(2);
                     Stage = "Stage_Nervous";
@@ -664,7 +781,44 @@
                 this.el.sceneEl.emit('start-capture-animation');
               }
 
-            // Lovers (all acts and stages)
+            /**
+             * ///////////////
+             * NERVOUS SCREAMER (Act II, Nervous Stage)
+             * //////////////
+            */
+            } else if (captured.some(p => p.mood === 'nervous') || captured.some(p => p.mood === 'scared') || captured.some(p => p.mood === 'confused')) {
+              if (captured.some(p => p.mood === 'scared')) {
+                const capturedNervous = captured.find(p => p.mood === 'scared'); // find the correct peep
+                const scaredEl       = capturedNervous.el;
+
+                if (captured.some(p => p.mood === 'confused')) {
+                  updateCaption('circleFearsSquares', true);
+                  this.el.sceneEl.emit('start-capture-animation');
+  
+                  if (scaredEl.parentNode) scaredEl.parentNode.removeChild(scaredEl); console.log(scaredEl.id + " executed");
+
+                  //Set the next Stage's main peep: Snobby
+                  
+                  spawnNeutralPeeps(2);
+                  Stage = "Stage_Snobby";
+                  
+                } else {
+                  updateCaption('whoScaresThem');
+                  this.el.sceneEl.emit('start-capture-animation');
+                }
+              } else if (captured.some(p => p.mood === 'confused')) {
+                  updateCaption('justMissed');
+                  this.el.sceneEl.emit('start-capture-animation');
+              } else {
+                updateCaption('somethingInteresting');
+                this.el.sceneEl.emit('start-capture-animation');
+              }
+
+            /**
+             * ///////////////
+             * LOVERS (Act I and II, All Stages)
+             * //////////////
+            */
             } else if (captured.some(p => p.type === 'lover_circle') && captured.some(p => p.type === 'lover_square')) {
               const capturedCircleLover = captured.find(p => p.type === 'lover_circle'); // find the correct peeps
               const circEl              = capturedCircleLover.el;
@@ -738,12 +892,16 @@
                 }
               });
 
-            // Hatted Peep (all acts and stages)
-            } else if (captured.some(p => p.mood === 'hatted')) {
+            /**
+             * ///////////////
+             * HATTED PEEPS (Act I and II, All Stages)
+             * //////////////
+            */
+            } else if (captured.some(p => p.accessory === 'hat')) {
               updateCaption('notCoolAnymore');
               this.el.sceneEl.emit('start-capture-animation');
 
-              captured.filter(p => p.mood === 'hatted').forEach(p => {
+              captured.filter(p => p.accessory === 'hat').forEach(p => {
                 const peepEl  = p.el;
                 const face    = peepEl.querySelector('a-image[src="#faceSheet"]');
                 const hat     = peepEl.querySelector('a-image[src="#hatSheet"]');
@@ -805,19 +963,28 @@
 
               });
 
-            // DEFAULT
-            // Phone on phone
-            } else if (capturedPhones.length > 0) {
-              updateCaption('phoneOnPhone');
-              this.el.sceneEl.emit('start-capture-animation');
-            // A single normal peep
-            } else if (captured.length === 1) {
-              updateCaption('normalPeep');
-              this.el.sceneEl.emit('start-capture-animation');
+            /**
+             * ///////////////
+             * DEFAULT (All the time, except ACT III)
+             * //////////////
+            */
+            } else if (Act !== 3) {
+              // Phone on phone
+              if (capturedPhones.length > 0) {
+                updateCaption('phoneOnPhone');
+                this.el.sceneEl.emit('start-capture-animation');
+              // A single normal peep
+              } else if (captured.length === 1) {
+                updateCaption('normalPeep');
+                this.el.sceneEl.emit('start-capture-animation');
+              } else {
+              // A few normal peeps
+                updateCaption('normalPeeps');
+                this.el.sceneEl.emit('start-capture-animation');
+              }
             } else {
-            // A few normal peeps
-              updateCaption('normalPeeps');
-              this.el.sceneEl.emit('start-capture-animation');
+              console.error('HOW DID THIS TRIGGER?')
+              return; // here will stand the final code, the one that controls the Act 3 different dialogs
             }
 
             ////////////////////////////////////////////////////////
@@ -969,7 +1136,7 @@
       AFRAME.registerComponent('crazy-behavior', {
         schema: {
           screamRange:      { type: 'number', default: 2 },
-          screamCooldown:   { type: 'number', default: 3000 },
+          screamCooldown:   { type: 'number', default: 4000 },
           screamAnimStart:  { type: 'number', default: 10 },
           screamAnimEnd:    { type: 'number', default: 20 },
           frameDuration:    { type: 'number', default: 0.08 }
@@ -1008,10 +1175,9 @@
           if (closest) this.screamAt(closest);
         },
         screamAt: function (targetPeep) {
-          this.screaming = true;
-          this.screamedAt = targetPeep;
-          const frameCount = this.data.screamAnimEnd - this.data.screamAnimStart + 1;
-          const animDuration = frameCount * this.data.frameDuration * 1000; // ms
+          this.screaming      = true;
+          const frameCount    = this.data.screamAnimEnd - this.data.screamAnimStart + 1;
+          const animDuration  = frameCount * this.data.frameDuration * 1000; // ms
 
           // Stop crazy movement, play scream animation
           this.el.removeAttribute('peep-mover');
@@ -1054,7 +1220,7 @@
               frameDuration:    this.data.frameDuration,
               loop:             true
             });
-            this.el.setAttribute('peep-mover', '');
+            this.el.setAttribute('peep-mover', `${CRAZY_DEFAULT_SPEED}`);
             this.el.setAttribute('peep-flipper', '');
             this.screaming = false;
             this.el.setAttribute('mood', `${previousMood}`);
@@ -1063,7 +1229,7 @@
             setTimeout(() => { this.cooldown = false; }, this.data.screamCooldown);
           }, animDuration);
 
-          // After 3s, reset target peep to neutral mood/face and restore mover
+          // After cooldown, reset target peep to neutral mood/face and restore mover
           setTimeout(() => {
             targetPeep.setAttribute('mood', `neutral`);
             this.replaceFace(targetPeep, 0);
@@ -1107,6 +1273,174 @@
       });
 
       /**
+       * NERVOUS-BEHAVIOR COMPONENT
+       * Makes the whole nervous peep behaviour and reaction to it
+       * lightly chatGPT assisted.
+       */
+      AFRAME.registerComponent('nervous-behavior', {
+        schema: {
+          scareRange:      { type: 'number', default: 2 },
+          scareCooldown:   { type: 'number', default: 4000 },
+          confusedRange:   { type: 'number', default: 3 },
+        },
+
+        init: function () {
+          this.cooldown       = false;
+          this.scared         = false;
+          this.scareTimeout   = null;
+          this.activeConfused = null;
+
+          this.el.setAttribute('peep-mover', `speed : ${NERVOUS_DEFAULT_SPEED}`); // --> for some reason if I remove peep-mover before, it just stops moving, this is also not doing anything
+
+          const face = this.el.querySelector('a-image[src="#nervousFaceSheet"]');
+          face.removeAttribute('spritesheet-animation');
+          face.setAttribute('spritesheet-animation', {
+            columns:            8,
+            rows:               4,
+            firstFrameIndex:    6,
+            lastFrameIndex:     16,
+            frameDuration:      0.1,
+            loop:               true,
+            customNervousLoop:  true,
+          });
+        },
+        tick: function () {
+          if (this.cooldown || this.scared) return;
+
+          // Check for the closest square peep that isn't confused
+          const myPos   = this.el.object3D.position;
+          const sceneEl = this.el.sceneEl;
+          const peeps   = Array.from(sceneEl.querySelectorAll('[data-peep-type]'))
+            .filter(el =>
+              el !== this.el &&
+              el.getAttribute('mood') !== 'confused' &&
+              el.getAttribute('data-peep-type') === 'square'
+            );
+
+          let closest = null, closestDist = Infinity;
+          peeps.forEach(peep => {
+            const pos   = peep.object3D.position;
+            const dist  = myPos.distanceTo(pos);
+            if (dist < this.data.scareRange && dist < closestDist) {
+              closest     = peep;
+              closestDist = dist;
+            }
+          });
+
+        if (closest) this.scaredFrom(closest);
+        },
+        scaredFrom: function (targetPeep) {
+          this.scared         = true;
+
+          // Stop crazy movement, play scared animation
+          this.el.removeAttribute('peep-mover');
+          this.el.removeAttribute('peep-flipper');
+          const previousMood = this.el.getAttribute('mood');
+
+          // Flip the scared towards the scaredFrom -- BUG this is not working
+          this.flipPeepToward(this.el, targetPeep);
+
+          const face = this.el.querySelector('a-image[src="#nervousFaceSheet"]');
+          face.removeAttribute('spritesheet-animation');
+          face.setAttribute('spritesheet-animation', {
+            columns:            8,
+            rows:               4,
+            firstFrameIndex:    17,
+            lastFrameIndex:     22,
+            frameDuration:      0.08,
+            loop:               false
+          });
+          this.el.setAttribute('mood', 'scared');
+
+          // Spook the target peep
+          targetPeep.setAttribute('mood', 'confused');
+          targetPeep.removeAttribute('peep-mover');
+          targetPeep.removeAttribute('peep-flipper');
+          // Flip target to look at crazy -- BUG this is not working
+          this.flipPeepToward(targetPeep, this.el);
+
+          // Replace face with confused face, after a slight delay for dramatic effect
+          setTimeout(() => {
+            this.replaceFace(targetPeep, 4, -0.15);
+          }, (22 - 17) * 0.08 * 1000 * 0.33);
+
+          // After the animation, nervous enters a run away phase
+          setTimeout(() => {
+            const face = this.el.querySelector('a-image[src="#nervousFaceSheet"]');
+            face.removeAttribute('spritesheet-animation');
+            face.setAttribute('spritesheet-animation', {
+              columns:            8,
+              rows:               4,
+              firstFrameIndex:    23,
+              lastFrameIndex:     25,
+              frameDuration:      0.08,
+              loop:               false,
+            });
+            face.setAttribute('position', '0 -0.18 0.01');
+            this.el.setAttribute('peep-mover', `speed : ${PEEP_DEFAULT_SPEED * 3.5}`);
+            this.el.setAttribute('peep-flipper', '');
+          }, 1500);
+
+          // Goes back to its normal nervous state
+          setTimeout(() => {
+            face.removeAttribute('spritesheet-animation');
+            face.setAttribute('spritesheet-animation', {
+              columns:            8,
+              rows:               4,
+              firstFrameIndex:    6,
+              lastFrameIndex:     16,
+              frameDuration:      0.1,
+              loop:               true,
+              customNervousLoop:  true,
+            });
+            face.setAttribute('position', '0 -0.02 0.01');
+            this.el.removeAttribute('peep-mover')
+            this.el.setAttribute('peep-mover', `speed : ${NERVOUS_DEFAULT_SPEED}`);
+            this.scared = false;
+            this.el.setAttribute('mood', `${previousMood}`);
+          }, this.data.scareCooldown);
+
+          // After 3s, reset target peep to neutral mood/face and restore mover
+          setTimeout(() => {
+            targetPeep.setAttribute('mood', `neutral`);
+            this.replaceFace(targetPeep, 0);
+            targetPeep.setAttribute('peep-mover', '');
+            targetPeep.setAttribute('peep-flipper', '');
+          }, 3000);
+        },
+        // Always swap face for new one
+        replaceFace: function (peepEl, frameIndex, y = 0) {
+          // Remove existing face (if any)
+          const oldFace = peepEl.querySelector('a-image[src="#faceSheet"]');
+          if (oldFace) peepEl.removeChild(oldFace);
+
+          const newFace = document.createElement('a-image');
+          newFace.setAttribute('src', '#faceSheet');
+          newFace.setAttribute('width', bodyWidth);
+          newFace.setAttribute('height', bodyHeight);
+          newFace.setAttribute('position', `0.04 ${y} 0.01`);
+          newFace.setAttribute('spritesheet-animation', {
+            columns:          2,
+            rows:             7,
+            firstFrameIndex:  frameIndex,
+            lastFrameIndex:   frameIndex,
+            frameDuration:    3,
+            loop: true
+          });
+          newFace.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+          peepEl.appendChild(newFace);
+        },
+        flipPeepToward: function (peep, targetPos) {
+          const myPos = peep.object3D.position;
+          const flip = (targetPos.x > myPos.x) ? 1 : -1;
+            peep.setAttribute('scale', `${flip} 1 1`);
+        },
+        remove: function () {
+          clearTimeout(this.screamTimeout);
+        }
+      });
+
+      /**
        * FOLLOW-TARGET COMPONENT
        * Permits the square lover to follow the circle lover
        * Heavily chatGPT assisted
@@ -1116,7 +1450,7 @@
         target:      { type: 'selector' },
         speed:       { type: 'number', default: PEEP_DEFAULT_SPEED },
         minDistance: { type: 'number', default: 0.6 },
-        tolerance:   { type: 'number', default: 0.4 }
+        tolerance:   { type: 'number', default: 0.5 }
       },
 
       init: function () {
@@ -1197,7 +1531,6 @@
         },
 
         init: function () {
-          this.originalSpeeds       = new Map();
           this.originalFacePos      = new Map();
           this.originalMoverTicks   = new Map();
           this.originalFlipperTicks = new Map();
@@ -1220,8 +1553,6 @@
             // 1a) Halt their movement
             const mover = peepEl.components['peep-mover'];
             if (mover) {
-              // remember its speed
-              this.originalSpeeds.set(peepEl, mover.data.speed);
               // remember its tick function
               this.originalMoverTicks.set(peepEl, mover.tick.bind(mover));
               // disable movement
@@ -1313,10 +1644,12 @@
               const mover = peepEl.components['peep-mover'];
               if (mover && this.originalMoverTicks.has(peepEl)) {
                 mover.tick = this.originalMoverTicks.get(peepEl);
-                const speed = this.originalSpeeds.get(peepEl);
-                peepEl.setAttribute('peep-mover', `speed: ${speed}`);
+
+                // Set correct default speed for this peep type:
+                const defaultSpeed = getDefaultPeepSpeed(peepEl);
+                peepEl.setAttribute('peep-mover', `speed: ${defaultSpeed}`);
+
                 this.originalMoverTicks.delete(peepEl);
-                this.originalSpeeds.delete(peepEl);
               }
               // 3b) restore flipper
               const flipper = peepEl.components['peep-flipper'];
