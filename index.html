@@ -12,15 +12,20 @@
       const HATGUY_DEFAULT_SPEED  = PEEP_DEFAULT_SPEED * 0.8;
       const CRAZY_DEFAULT_SPEED   = PEEP_DEFAULT_SPEED * 1.5;
       const NERVOUS_DEFAULT_SPEED = PEEP_DEFAULT_SPEED * 0.7;
+      const ANGRY_DEFAULT_SPEED   = PEEP_DEFAULT_SPEED * 1.8;
+      const WEIRDO_DEFAULT_SPEED  = PEEP_DEFAULT_SPEED * 1.5;
       const DISMISS_TIME          = 5000; //ms
       let   dismissTime           = DISMISS_TIME;
       const AUTO_DISMISS_TIME     = 15000;//ms
 
       function getDefaultPeepSpeed(peepEl) {
         const type = peepEl.getAttribute('data-peep-type');
-        if (type === 'hat_guy')                       return HATGUY_DEFAULT_SPEED;
-        if (type === 'crazy')                         return CRAZY_DEFAULT_SPEED;
-        if (type === 'nervous' || type === 'scared')  return NERVOUS_DEFULT_SPEED;
+        const mood = peepEl.getAttribute('mood');
+        if (type === 'hat_guy')                         return HATGUY_DEFAULT_SPEED;
+        if (type === 'crazy')                           return CRAZY_DEFAULT_SPEED;
+        if (mood === 'nervous'  || mood === 'scared')   return NERVOUS_DEFAULT_SPEED;
+        if (mood === 'angry'    || mood === 'shouting') return ANGRY_DEFAULT_SPEED;
+        if (type === 'weirdo')                          return CRAZY_DEFAULT_SPEED;
         return PEEP_DEFAULT_SPEED;
       }
 
@@ -843,7 +848,7 @@
 
             /**
              * ///////////////
-             * NERVOUS SCREAMER (Act II, Nervous Stage)
+             * NERVOUS PEEP (Act II, Nervous Stage)
              * //////////////
             */
             } else if (captured.some(p => p.mood === 'nervous') || captured.some(p => p.mood === 'scared') || captured.some(p => p.mood === 'confused')) {
@@ -858,7 +863,7 @@
                   if (scaredEl.parentNode) scaredEl.parentNode.removeChild(scaredEl); console.log(scaredEl.id + " executed");
 
                   //Set the next Stage's main peep: Snobby
-                  // Pick one random circle-type peep
+                  // Pick one random square-type peep
                   let squares = Array.from(sceneEl.querySelectorAll('[data-peep-type]')).filter(el => el.dataset.peepType === 'square' && el.getAttribute('mood') !== 'confused');
                   squares.sort(() => 0.5 - Math.random());
                   const chosen = squares.slice(0, 1); // I'm keeping it an array if I want to ever change it to be multiple snobbies
@@ -911,7 +916,7 @@
 
             /**
              * ///////////////
-             * SNOBBY SCREAMER (Act II, Snobby Stage)
+             * SNOBBY PEEP (Act II, Snobby Stage)
              * //////////////
             */
             } else if (captured.some(p => p.mood === 'snobby') || captured.some(p => p.mood === 'smug') || captured.some(p => p.mood === 'offended')) {
@@ -924,7 +929,56 @@
 
                 if (smugEl.parentNode) smugEl.parentNode.removeChild(smugEl); console.log(smugEl.id + " executed");
 
-                //Set the next Stage's main peep: ???
+                // Everyone removes their hats
+                const allHatted = Array.from(document.querySelectorAll('[accessory="hat"]'));
+                allHatted.forEach(peepEl => {
+                  const face = peepEl.querySelector('a-image[src="#faceSheet"]');
+                  const hat  = peepEl.querySelector('a-image[src="#hatSheet"]');
+
+                  // Replace face with neutral (immediately, no embarrassed)
+                  if (face) {
+                    peepEl.removeChild(face);
+                    const neutralFace = document.createElement('a-image');
+                    neutralFace.setAttribute('src',   '#faceSheet');
+                    neutralFace.setAttribute('width',  bodyWidth);
+                    neutralFace.setAttribute('height', bodyHeight);
+                    neutralFace.setAttribute('position', `0.04 0 0.01`);
+                    neutralFace.setAttribute('spritesheet-animation', {
+                      columns:          2,
+                      rows:             7,
+                      firstFrameIndex:  0, // neutral face
+                      lastFrameIndex:   0,
+                      frameDuration:    3,
+                      loop:             true
+                    });
+                    neutralFace.setAttribute('material', 'transparent: true; alphaTest: 0.01');
+                    peepEl.appendChild(neutralFace);
+                  }
+
+                  // Animate hat removal, then remove hat node
+                  if (hat) {
+                    // Start hat removal animation after a short pause
+                    setTimeout(() => {
+                      hat.setAttribute('spritesheet-animation', {
+                        columns:          4,
+                        rows:             7,
+                        firstFrameIndex:  14,
+                        lastFrameIndex:   25,
+                        frameDuration:    0.1,
+                        loop:             false
+                      });
+                    }, 500);
+                    
+                    setTimeout(() => {
+                      if (hat.parentNode) peepEl.removeChild(hat);
+                    }, 1800);
+                  }
+
+                  peepEl.removeAttribute('accessory');
+                  peepEl.setAttribute('mood', 'neutral');
+                });
+
+                //Set the next Stage's main peep: Angry Circle
                 
                 Stage = "Stage_Angry_Escalation";
                 
@@ -935,6 +989,13 @@
                 updateCaption('somethingInteresting');
                 this.el.sceneEl.emit('start-capture-animation');
               }
+
+            /**
+             * ///////////////
+             * ANGRY PEEPS (Act II, Angry Escalation Stage)
+             * //////////////
+            */
+            } else if (Act === 100) {
 
             /**
              * ///////////////
@@ -1081,7 +1142,8 @@
                   peepEl.removeChild(hat);
                 }, 5000);
 
-                  peepEl.setAttribute('mood', 'neutral');
+                peepEl.removeAttribute('accessory');
+                peepEl.setAttribute('mood', 'neutral');
 
               });
 
@@ -1187,13 +1249,17 @@
         init: function () {
           // Initialize a random movement direction
           this.direction = Math.random() * 2 * Math.PI;
+
+          // Give a slight speed variation
+          const variation = (Math.random() * 0.01) - 0.005;
+          this.speed = this.data.speed + variation;
         },
         tick: function (time, delta) {
           if (!this.data) return; // safeguard when the screamed at and screamer peeps get removed and put back the peep mover
           const pos     = this.el.object3D.position;
           const prevPos = pos.clone(); // this is needed to make sure peeps face the correct direction
           // Move in direction, scaled by delta
-          const moveAmt = this.data.speed * (delta / 16); // BUG: This sometimes breaks here when used for the screamer peep, need to check what to do here
+          const moveAmt = this.speed * (delta / 16);
           const dx      = Math.cos(this.direction) * moveAmt;
           const dz      = Math.sin(this.direction) * moveAmt;
           pos.x += dx;
@@ -1281,6 +1347,8 @@
             .filter(el =>
               el !== this.el &&
               el.getAttribute('mood') !== 'spooked' &&
+              el.getAttribute('data-peep-type') !== 'lover_circle' &&
+              el.getAttribute('data-peep-type') !== 'lover_square' &&
               el.getAttribute('data-peep-type') !== 'crazy'
             );
 
